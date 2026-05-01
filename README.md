@@ -56,5 +56,4 @@ pnpm dev          # SvelteKit dev server
 pnpm tauri dev    # Full Tauri desktop app
 ```
 
-## License
-TBD
+
