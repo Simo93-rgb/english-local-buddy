@@ -1,69 +1,76 @@
 """
 TTS (Text-to-Speech) Module
 =============================
-Stub for StyleTTS2 / XTTS speech synthesis.
+MVP implementation using ``edge-tts`` (Microsoft Edge online TTS).
+Fast, zero model downloads, high-quality voices.
+
+Future upgrade path: replace with a local GPU model (StyleTTS2, XTTS,
+Kokoro) once the conversational loop is validated.
 """
 
 from __future__ import annotations
 
-from typing import Any
+import io
+import logging
+
+import edge_tts
+
+logger = logging.getLogger(__name__)
+
+# Default voice – natural-sounding US English female
+# See full list: https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list
+DEFAULT_VOICE = "en-US-AvaMultilingualNeural"
 
 
-class TTSEngine:
+class TTSManager:
     """
-    Wraps the TTS model (StyleTTS2 or Coqui XTTS) for speech synthesis.
-
-    Attributes
-    ----------
-    model_name : str
-        TTS model identifier.
-    device : str
-        Compute device ("cuda" or "cpu").
-    model : Any
-        The loaded TTS model instance.
-    """
-
-    def __init__(self, model_name: str = "styletts2", device: str = "cuda") -> None:
-        self.model_name = model_name
-        self.device = device
-        self.model: Any = None
-
-    async def load_model(self) -> None:
-        """
-        Load the TTS model into memory.
-
-        This should be called once at application startup.
-        """
-        # TODO: Load StyleTTS2 or XTTS model here
-        # Example (Coqui XTTS):
-        #   from TTS.api import TTS
-        #   self.model = TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(self.device)
-        pass
-
-    async def unload_model(self) -> None:
-        """Release model resources."""
-        # TODO: Implement model cleanup
-        self.model = None
-
-
-async def synthesize_speech(text: str, speaker_wav: str | None = None) -> bytes:
-    """
-    Synthesize speech audio from text.
+    Text-to-Speech manager using edge-tts.
 
     Parameters
     ----------
-    text : str
-        The text to convert to speech.
-    speaker_wav : str or None, optional
-        Path to a reference WAV file for voice cloning (XTTS).
-
-    Returns
-    -------
-    bytes
-        Raw PCM audio data of the synthesised speech (16 kHz, mono).
+    voice : str
+        Edge TTS voice identifier.
     """
-    # TODO: Implement TTS synthesis
-    # 1. Run model inference with the input text
-    # 2. Optionally use speaker_wav for voice cloning
-    # 3. Return raw audio bytes
-    return b""
+
+    def __init__(self, voice: str = DEFAULT_VOICE) -> None:
+        self.voice = voice
+        logger.info("TTSManager initialised (voice=%s)", voice)
+
+    async def generate_audio(self, text: str) -> bytes:
+        """
+        Convert text to speech and return WAV-like audio bytes.
+
+        Parameters
+        ----------
+        text : str
+            The text to synthesise (typically the LLM's response).
+
+        Returns
+        -------
+        bytes
+            MP3 audio bytes (edge-tts outputs MP3 natively).
+            The frontend can play MP3 directly via ``Audio()``.
+        """
+        if not text or not text.strip():
+            return b""
+
+        try:
+            communicate = edge_tts.Communicate(text=text, voice=self.voice)
+
+            # Collect all audio chunks into a buffer
+            audio_buffer = io.BytesIO()
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_buffer.write(chunk["data"])
+
+            audio_bytes = audio_buffer.getvalue()
+            logger.info(
+                "TTS generated %d bytes of audio for: %s",
+                len(audio_bytes),
+                text[:60],
+            )
+            return audio_bytes
+
+        except Exception as exc:
+            logger.error("TTS synthesis failed: %s", exc)
+            raise

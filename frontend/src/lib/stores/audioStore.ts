@@ -1,15 +1,11 @@
 /**
  * Audio Store – WebSocket & MediaRecorder state management
  * =========================================================
- * Handles microphone capture via the Web Audio API (MediaRecorder)
- * and streams audio chunks over a WebSocket to the Python backend.
- *
- * Flow:
- *   1. User clicks "Start" → WebSocket connects → MediaRecorder starts
- *   2. Audio chunks (WebM/Opus, ~250 ms) are streamed as binary frames
- *   3. User clicks "Stop" → MediaRecorder stops → text "STOP" sent to backend
- *   4. Backend transcribes the accumulated audio and returns JSON
- *   5. WebSocket is closed after the response is received
+ * Handles the full conversational loop:
+ *   1. Capture mic audio → stream binary chunks to backend
+ *   2. Send "STOP" → backend runs ASR → LLM → TTS
+ *   3. Receive status updates, transcription, LLM text, and TTS audio
+ *   4. Auto-play the TTS audio response
  */
 
 import { writable, derived, get } from 'svelte/store';
@@ -19,20 +15,28 @@ import { writable, derived, get } from 'svelte/store';
 // ---------------------------------------------------------------------------
 
 export interface WSMessage {
+	type?: string;
 	status: string;
 	transcription?: string;
 	confidence?: number;
 	language?: string;
 	segments?: Array<{ start: number; end: number; text: string; avg_logprob: number }>;
 	gop_score?: number | null;
+	llm_text?: string;
+	audio_b64?: string;
+	audio_format?: string;
 	message?: string;
-	// Legacy mock fields (kept for backwards compatibility)
-	mock_transcription?: string;
-	mock_gop_score?: number;
 	timestamp: number;
 }
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'transcribing' | 'error';
+type ConnectionStatus =
+	| 'disconnected'
+	| 'connecting'
+	| 'connected'
+	| 'transcribing'
+	| 'thinking'
+	| 'speaking'
+	| 'error';
 
 // ---------------------------------------------------------------------------
 // Stores
@@ -47,13 +51,19 @@ export const connectionStatus = writable<ConnectionStatus>('disconnected');
 /** Log of messages received from the backend */
 export const messageLog = writable<WSMessage[]>([]);
 
+/** The latest transcription text */
+export const latestTranscription = writable<string>('');
+
+/** The latest LLM response text */
+export const latestLLMResponse = writable<string>('');
+
 /** The latest message from the backend */
 export const latestMessage = derived(messageLog, ($log) =>
 	$log.length > 0 ? $log[$log.length - 1] : null
 );
 
 // ---------------------------------------------------------------------------
-// Internal state (not reactive – module-level singletons)
+// Internal state
 // ---------------------------------------------------------------------------
 
 let ws: WebSocket | null = null;
@@ -62,6 +72,27 @@ let mediaStream: MediaStream | null = null;
 
 const WS_URL = 'ws://localhost:8000/ws/audio';
 const CHUNK_INTERVAL_MS = 250;
+
+// ---------------------------------------------------------------------------
+// Audio playback helper
+// ---------------------------------------------------------------------------
+
+function playAudioBase64(b64Data: string, format: string = 'mp3'): void {
+	try {
+		const byteChars = atob(b64Data);
+		const byteArray = new Uint8Array(byteChars.length);
+		for (let i = 0; i < byteChars.length; i++) {
+			byteArray[i] = byteChars.charCodeAt(i);
+		}
+		const blob = new Blob([byteArray], { type: `audio/${format}` });
+		const url = URL.createObjectURL(blob);
+		const audio = new Audio(url);
+		audio.onended = () => URL.revokeObjectURL(url);
+		audio.play().catch((err) => console.error('[audioStore] Playback failed:', err));
+	} catch (err) {
+		console.error('[audioStore] Failed to decode/play audio:', err);
+	}
+}
 
 // ---------------------------------------------------------------------------
 // WebSocket helpers
@@ -85,11 +116,37 @@ function connectWebSocket(): Promise<void> {
 					...JSON.parse(event.data),
 					timestamp: Date.now(),
 				};
-				messageLog.update((log) => [...log, data]);
 
-				// If we got a transcription result back, we can close the socket
-				if (data.status === 'ok' || data.status === 'empty' || data.status === 'error') {
-					connectionStatus.set('connected');
+				// Update connection status based on pipeline stage
+				if (data.type === 'status' && data.status) {
+					const statusMap: Record<string, ConnectionStatus> = {
+						transcribing: 'transcribing',
+						thinking: 'thinking',
+						speaking: 'speaking',
+						done: 'connected',
+					};
+					const mapped = statusMap[data.status];
+					if (mapped) connectionStatus.set(mapped);
+				}
+
+				// Capture transcription
+				if (data.type === 'transcription' && data.transcription) {
+					latestTranscription.set(data.transcription);
+				}
+
+				// Capture LLM response
+				if (data.type === 'llm_response' && data.llm_text) {
+					latestLLMResponse.set(data.llm_text);
+				}
+
+				// Auto-play TTS audio
+				if (data.type === 'tts_audio' && data.audio_b64) {
+					playAudioBase64(data.audio_b64, data.audio_format || 'mp3');
+				}
+
+				// Log all non-status messages
+				if (data.type !== 'status') {
+					messageLog.update((log) => [...log, data]);
 				}
 			} catch (err) {
 				console.error('[audioStore] Failed to parse WS message:', err);
@@ -136,7 +193,6 @@ async function startCapture(): Promise<void> {
 		mimeType: 'audio/webm;codecs=opus',
 	});
 
-	// Collect audio data and send over WebSocket at regular intervals
 	mediaRecorder.ondataavailable = (event: BlobEvent) => {
 		if (event.data.size > 0 && ws?.readyState === WebSocket.OPEN) {
 			event.data.arrayBuffer().then((buffer) => {
@@ -145,9 +201,7 @@ async function startCapture(): Promise<void> {
 		}
 	};
 
-	// Request data every CHUNK_INTERVAL_MS
 	mediaRecorder.start(CHUNK_INTERVAL_MS);
-
 	console.log('[audioStore] MediaRecorder started');
 }
 
@@ -161,7 +215,6 @@ function stopCapture() {
 		mediaStream.getTracks().forEach((track) => track.stop());
 		mediaStream = null;
 	}
-
 	console.log('[audioStore] MediaRecorder stopped');
 }
 
@@ -187,38 +240,45 @@ export async function startRecording(): Promise<void> {
 }
 
 /**
- * Stop recording: stop microphone → send STOP command → wait for
- * the transcription result, then close the WebSocket.
+ * Stop recording: stop mic → send STOP → keep WS open for the full
+ * ASR → LLM → TTS pipeline response.
  */
 export function stopRecording(): void {
-	// 1. Stop the microphone immediately
 	stopCapture();
 	isRecording.set(false);
 
-	// 2. Tell the backend to transcribe the buffered audio
 	const currentWs = ws;
 	if (currentWs && currentWs.readyState === WebSocket.OPEN) {
 		connectionStatus.set('transcribing');
-		console.log('[audioStore] Sending STOP command …');
+		console.log('[audioStore] Sending STOP …');
 		currentWs.send('STOP');
 
-		// 3. Give the backend time to respond, then close
-		//    (the onmessage handler will log the result)
-		//    Close after a generous timeout to handle slow transcriptions
+		// Close the WebSocket after the pipeline completes (status: "done")
+		// or after a generous timeout
 		const closeTimeout = setTimeout(() => {
 			disconnectWebSocket();
-		}, 30_000); // 30 s max wait
+		}, 60_000); // 60 s max for the full pipeline
 
-		// If we receive a message, close sooner
 		const originalOnMessage = currentWs.onmessage;
 		currentWs.onmessage = (event: MessageEvent) => {
-			// Process the message with the original handler
 			if (originalOnMessage) {
 				originalOnMessage.call(currentWs, event);
 			}
-			// Close after receiving the transcription result
-			clearTimeout(closeTimeout);
-			setTimeout(() => disconnectWebSocket(), 500);
+			try {
+				const data = JSON.parse(event.data);
+				// Close WS when the pipeline is fully done
+				if (data.type === 'status' && data.status === 'done') {
+					clearTimeout(closeTimeout);
+					setTimeout(() => disconnectWebSocket(), 1000);
+				}
+				// Also close on error
+				if (data.type === 'error') {
+					clearTimeout(closeTimeout);
+					setTimeout(() => disconnectWebSocket(), 500);
+				}
+			} catch {
+				// ignore parse errors
+			}
 		};
 	} else {
 		disconnectWebSocket();
@@ -237,8 +297,15 @@ export async function toggleRecording(): Promise<void> {
 }
 
 /**
- * Clear the message log.
+ * Clear the message log and LLM conversation history.
  */
 export function clearLog(): void {
 	messageLog.set([]);
+	latestTranscription.set('');
+	latestLLMResponse.set('');
+
+	// Also tell the backend to clear LLM history
+	if (ws && ws.readyState === WebSocket.OPEN) {
+		ws.send('CLEAR');
+	}
 }

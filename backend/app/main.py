@@ -2,20 +2,21 @@
 English Buddy – FastAPI Backend
 ================================
 Main entrypoint for the FastAPI server.
-Provides WebSocket endpoints for real-time audio streaming
-and REST endpoints for configuration and state management.
+
+Full pipeline:  Audio chunks → ASR (Whisper) → LLM (LM Studio) → TTS (edge-tts)
 
 Audio flow
 ----------
 1. Frontend streams binary audio chunks (WebM/Opus, ~250 ms each)
    over WebSocket ``/ws/audio``.
 2. Backend accumulates chunks in a per-connection buffer.
-3. When the client sends a text message ``"STOP"`` (or the buffer
-   exceeds ``MAX_BUFFER_BYTES``), the accumulated audio is decoded
-   and passed through the ASR pipeline.
-4. The transcription result is sent back as JSON.
+3. Client sends text ``"STOP"`` → buffer is transcribed via Whisper.
+4. Transcription is sent to the LLM for a conversational reply.
+5. LLM response is synthesised to speech via TTS.
+6. JSON status messages + base64-encoded audio are sent back.
 """
 
+import base64
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -25,16 +26,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.ai_pipeline.asr import WhisperASR
+from app.ai_pipeline.llm import LLMManager
+from app.ai_pipeline.tts import TTSManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# ASR singleton – loaded once into VRAM at startup
+# Singletons – loaded once at startup
 # ---------------------------------------------------------------------------
 asr_engine: WhisperASR | None = None
+llm_manager: LLMManager | None = None
+tts_manager: TTSManager | None = None
 
-# Maximum buffer size before we force a transcription (5 MB ≈ ~30 s WebM)
+# Maximum buffer size before auto-flush (5 MB ≈ ~30 s WebM)
 MAX_BUFFER_BYTES = 5 * 1024 * 1024
 
 
@@ -42,10 +47,9 @@ MAX_BUFFER_BYTES = 5 * 1024 * 1024
 async def lifespan(app: FastAPI):
     """
     FastAPI lifespan handler.
-    Load heavy ML models into GPU memory on startup,
-    release them on shutdown.
+    Load heavy ML models on startup, release on shutdown.
     """
-    global asr_engine
+    global asr_engine, llm_manager, tts_manager
 
     # ---- Startup ----
     logger.info("Loading ASR model …")
@@ -57,6 +61,17 @@ async def lifespan(app: FastAPI):
     asr_engine.load_model()
     logger.info("ASR model ready.")
 
+    logger.info("Initialising LLM manager …")
+    llm_manager = LLMManager(
+        base_url=settings.LLM_BASE_URL,
+        model=settings.LLM_MODEL,
+    )
+    logger.info("LLM manager ready.")
+
+    logger.info("Initialising TTS manager …")
+    tts_manager = TTSManager()
+    logger.info("TTS manager ready.")
+
     yield  # ← application runs here
 
     # ---- Shutdown ----
@@ -64,6 +79,8 @@ async def lifespan(app: FastAPI):
     if asr_engine is not None:
         asr_engine.unload_model()
         asr_engine = None
+    llm_manager = None
+    tts_manager = None
     logger.info("Cleanup complete.")
 
 
@@ -75,7 +92,7 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS – allow the Tauri/SvelteKit frontend to connect
+# CORS
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
@@ -101,15 +118,13 @@ async def health_check():
 @app.websocket("/ws/audio")
 async def websocket_audio(ws: WebSocket):
     """
-    Accept incoming audio from the client and return ASR results.
+    Full conversational pipeline over a single WebSocket connection.
 
     Protocol
     --------
-    * **Binary messages** → raw audio chunks (appended to a buffer).
-    * **Text message ``"STOP"``** → triggers transcription of the
-      buffered audio, returns JSON result, and resets the buffer.
-    * The buffer is also flushed automatically when it exceeds
-      ``MAX_BUFFER_BYTES``.
+    * **Binary messages** → raw audio chunks (appended to buffer).
+    * **Text ``"STOP"``** → trigger ASR → LLM → TTS pipeline.
+    * **Text ``"CLEAR"``** → reset LLM conversation history.
     """
     await ws.accept()
     logger.info("WebSocket client connected.")
@@ -130,14 +145,10 @@ async def websocket_audio(ws: WebSocket):
                     len(audio_buffer),
                 )
 
-                # Auto-flush if the buffer gets too large
+                # Auto-flush if buffer gets too large
                 if len(audio_buffer) >= MAX_BUFFER_BYTES:
-                    logger.info(
-                        "Buffer exceeded %d B – auto-flushing for transcription.",
-                        MAX_BUFFER_BYTES,
-                    )
-                    result = await _transcribe_buffer(audio_buffer)
-                    await ws.send_text(json.dumps(result))
+                    logger.info("Buffer auto-flush at %d B", len(audio_buffer))
+                    await _run_pipeline(ws, audio_buffer)
                     audio_buffer.clear()
 
             # --- Text frame: control message ------------------------------
@@ -147,21 +158,26 @@ async def websocket_audio(ws: WebSocket):
                 if text_msg == "STOP":
                     if len(audio_buffer) == 0:
                         await ws.send_text(json.dumps({
+                            "type": "result",
                             "status": "empty",
                             "transcription": "",
-                            "gop_score": None,
                         }))
                         continue
 
-                    logger.info(
-                        "STOP received – transcribing %d B of audio.",
-                        len(audio_buffer),
-                    )
-                    result = await _transcribe_buffer(audio_buffer)
-                    await ws.send_text(json.dumps(result))
+                    logger.info("STOP – transcribing %d B", len(audio_buffer))
+                    await _run_pipeline(ws, audio_buffer)
                     audio_buffer.clear()
+
+                elif text_msg == "CLEAR":
+                    if llm_manager:
+                        llm_manager.clear_history()
+                    await ws.send_text(json.dumps({
+                        "type": "status",
+                        "status": "history_cleared",
+                    }))
+
                 else:
-                    logger.warning("Unknown text command: %s", text_msg)
+                    logger.warning("Unknown command: %s", text_msg)
 
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected.")
@@ -174,27 +190,118 @@ async def websocket_audio(ws: WebSocket):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Pipeline helper
 # ---------------------------------------------------------------------------
 
-async def _transcribe_buffer(buffer: bytearray) -> dict:
+async def _run_pipeline(ws: WebSocket, buffer: bytearray) -> None:
     """
-    Run ASR on the accumulated audio buffer and return a JSON-ready dict.
+    Execute the full ASR → LLM → TTS pipeline and send results
+    back over the WebSocket.
     """
+
+    # ---- 1. ASR (Speech-to-Text) ----------------------------------------
     if asr_engine is None:
-        return {"status": "error", "message": "ASR engine not loaded"}
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "status": "error",
+            "message": "ASR engine not loaded",
+        }))
+        return
+
+    await ws.send_text(json.dumps({
+        "type": "status",
+        "status": "transcribing",
+    }))
 
     try:
-        result = await asr_engine.transcribe_audio_bytes(bytes(buffer))
-        return {
-            "status": "ok",
-            "transcription": result["text"],
-            "confidence": result["confidence"],
-            "language": result["language"],
-            "segments": result["segments"],
-            # TODO: Replace with real GOP score once pronunciation module is ready
-            "gop_score": None,
-        }
+        asr_result = await asr_engine.transcribe_audio_bytes(bytes(buffer))
+        transcription = asr_result["text"]
     except Exception as exc:
-        logger.error("Transcription failed: %s", exc, exc_info=True)
-        return {"status": "error", "message": str(exc)}
+        logger.error("ASR failed: %s", exc, exc_info=True)
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "status": "error",
+            "message": f"Transcription failed: {exc}",
+        }))
+        return
+
+    # Send the transcription immediately
+    await ws.send_text(json.dumps({
+        "type": "transcription",
+        "status": "ok",
+        "transcription": transcription,
+        "confidence": asr_result.get("confidence", 0.0),
+        "language": asr_result.get("language", "en"),
+        "segments": asr_result.get("segments", []),
+    }))
+
+    if not transcription.strip():
+        return
+
+    # ---- 2. LLM (Conversational response) --------------------------------
+    if llm_manager is None:
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "status": "error",
+            "message": "LLM not available",
+        }))
+        return
+
+    await ws.send_text(json.dumps({
+        "type": "status",
+        "status": "thinking",
+    }))
+
+    try:
+        llm_response = await llm_manager.get_response(transcription)
+    except Exception as exc:
+        logger.error("LLM failed: %s", exc, exc_info=True)
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "status": "error",
+            "message": f"LLM request failed: {exc}",
+        }))
+        return
+
+    # Send the LLM text response
+    await ws.send_text(json.dumps({
+        "type": "llm_response",
+        "status": "ok",
+        "llm_text": llm_response,
+    }))
+
+    # ---- 3. TTS (Text-to-Speech) -----------------------------------------
+    if tts_manager is None:
+        return
+
+    await ws.send_text(json.dumps({
+        "type": "status",
+        "status": "speaking",
+    }))
+
+    try:
+        audio_bytes = await tts_manager.generate_audio(llm_response)
+    except Exception as exc:
+        logger.error("TTS failed: %s", exc, exc_info=True)
+        await ws.send_text(json.dumps({
+            "type": "error",
+            "status": "error",
+            "message": f"TTS synthesis failed: {exc}",
+        }))
+        return
+
+    if audio_bytes:
+        # Send audio as base64 inside JSON for easy frontend handling
+        audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+        await ws.send_text(json.dumps({
+            "type": "tts_audio",
+            "status": "ok",
+            "audio_b64": audio_b64,
+            "audio_format": "mp3",
+        }))
+
+    # ---- Done ----
+    await ws.send_text(json.dumps({
+        "type": "status",
+        "status": "done",
+    }))

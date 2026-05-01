@@ -3,7 +3,8 @@
 		isRecording,
 		connectionStatus,
 		messageLog,
-		latestMessage,
+		latestTranscription,
+		latestLLMResponse,
 		toggleRecording,
 		clearLog,
 	} from '$lib/stores/audioStore';
@@ -24,9 +25,38 @@
 			hour: '2-digit',
 			minute: '2-digit',
 			second: '2-digit',
-			fractionalSecondDigits: 3,
 		});
 	}
+
+	const statusLabels: Record<string, string> = {
+		disconnected: 'Disconnected',
+		connecting: 'Connecting…',
+		connected: 'Connected',
+		transcribing: 'Transcribing…',
+		thinking: 'Thinking…',
+		speaking: 'Speaking…',
+		error: 'Error',
+	};
+
+	const statusColors: Record<string, string> = {
+		disconnected: 'bg-gray-800 text-gray-400',
+		connecting: 'bg-amber-900/50 text-amber-300',
+		connected: 'bg-emerald-900/50 text-emerald-300',
+		transcribing: 'bg-violet-900/50 text-violet-300',
+		thinking: 'bg-blue-900/50 text-blue-300',
+		speaking: 'bg-cyan-900/50 text-cyan-300',
+		error: 'bg-red-900/50 text-red-300',
+	};
+
+	const dotColors: Record<string, string> = {
+		disconnected: 'bg-gray-500',
+		connecting: 'bg-amber-400 animate-pulse',
+		connected: 'bg-emerald-400',
+		transcribing: 'bg-violet-400 animate-pulse',
+		thinking: 'bg-blue-400 animate-pulse',
+		speaking: 'bg-cyan-400 animate-pulse',
+		error: 'bg-red-400',
+	};
 </script>
 
 <svelte:head>
@@ -45,31 +75,9 @@
 
 	<!-- Connection status badge -->
 	<div class="mb-6">
-		<span
-			class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium
-				{$connectionStatus === 'connected'
-					? 'bg-emerald-900/50 text-emerald-300'
-					: $connectionStatus === 'connecting'
-						? 'bg-amber-900/50 text-amber-300'
-						: $connectionStatus === 'transcribing'
-							? 'bg-violet-900/50 text-violet-300'
-							: $connectionStatus === 'error'
-								? 'bg-red-900/50 text-red-300'
-								: 'bg-gray-800 text-gray-400'}"
-		>
-			<span
-				class="h-2 w-2 rounded-full
-					{$connectionStatus === 'connected'
-						? 'bg-emerald-400 animate-pulse'
-						: $connectionStatus === 'connecting'
-							? 'bg-amber-400 animate-pulse'
-							: $connectionStatus === 'transcribing'
-								? 'bg-violet-400 animate-pulse'
-								: $connectionStatus === 'error'
-									? 'bg-red-400'
-									: 'bg-gray-500'}"
-			></span>
-			{$connectionStatus}
+		<span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium {statusColors[$connectionStatus] ?? 'bg-gray-800 text-gray-400'}">
+			<span class="h-2 w-2 rounded-full {dotColors[$connectionStatus] ?? 'bg-gray-500'}"></span>
+			{statusLabels[$connectionStatus] ?? $connectionStatus}
 		</span>
 	</div>
 
@@ -79,7 +87,6 @@
 		onclick={handleToggle}
 		class="relative group mb-8 cursor-pointer"
 	>
-		<!-- Pulsing ring when recording -->
 		{#if $isRecording}
 			<span class="absolute inset-0 rounded-full bg-red-500/20 animate-ping"></span>
 		{/if}
@@ -91,12 +98,10 @@
 					: 'bg-indigo-600 shadow-lg shadow-indigo-600/40 hover:bg-indigo-500'}"
 		>
 			{#if $isRecording}
-				<!-- Stop icon -->
 				<svg class="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
 					<rect x="6" y="6" width="12" height="12" rx="2" />
 				</svg>
 			{:else}
-				<!-- Mic icon -->
 				<svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" />
 					<path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 0 1-14 0v-2" />
@@ -111,8 +116,12 @@
 		{$isRecording
 			? 'Recording… click to stop'
 			: $connectionStatus === 'transcribing'
-				? 'Transcribing audio…'
-				: 'Click to start recording'}
+				? 'Transcribing your audio…'
+				: $connectionStatus === 'thinking'
+					? 'Generating response…'
+					: $connectionStatus === 'speaking'
+						? '🔊 Playing response…'
+						: 'Click to start recording'}
 	</p>
 
 	<!-- Error banner -->
@@ -122,48 +131,40 @@
 		</div>
 	{/if}
 
-	<!-- Latest result card -->
-	{#if $latestMessage}
-		<div class="mb-8 w-full max-w-xl rounded-2xl border border-gray-800 bg-gray-900/60 backdrop-blur p-6">
-			<h2 class="text-lg font-semibold text-gray-200 mb-4">Latest Result</h2>
-			<div class="grid grid-cols-1 gap-4">
-				<div>
-					<p class="text-xs text-gray-500 uppercase tracking-wider">Transcription</p>
-					<p class="mt-1 text-xl font-medium text-white">
-						{$latestMessage.transcription || $latestMessage.mock_transcription || '—'}
-					</p>
+	<!-- Conversation cards -->
+	<div class="w-full max-w-xl space-y-4 mb-8">
+		<!-- User's transcription -->
+		{#if $latestTranscription}
+			<div class="rounded-2xl border border-gray-800 bg-gray-900/60 backdrop-blur p-5">
+				<div class="flex items-center gap-2 mb-2">
+					<span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">You said</span>
 				</div>
-				<div class="grid grid-cols-2 gap-4">
-					<div>
-						<p class="text-xs text-gray-500 uppercase tracking-wider">Confidence</p>
-						<p class="mt-1 text-lg font-semibold text-cyan-400">
-							{$latestMessage.confidence != null
-								? (($latestMessage.confidence ?? 0) * 100).toFixed(1) + '%'
-								: '—'}
-						</p>
-					</div>
-					<div>
-						<p class="text-xs text-gray-500 uppercase tracking-wider">GOP Score</p>
-						<p class="mt-1 text-lg font-semibold text-gray-500">
-							{$latestMessage.gop_score ?? 'N/A'}
-						</p>
-					</div>
-				</div>
+				<p class="text-lg text-white">{$latestTranscription}</p>
 			</div>
-		</div>
-	{/if}
+		{/if}
+
+		<!-- Bot's response -->
+		{#if $latestLLMResponse}
+			<div class="rounded-2xl border border-cyan-900/50 bg-cyan-950/30 backdrop-blur p-5">
+				<div class="flex items-center gap-2 mb-2">
+					<span class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">🤖 Buddy</span>
+				</div>
+				<p class="text-lg text-gray-100">{$latestLLMResponse}</p>
+			</div>
+		{/if}
+	</div>
 
 	<!-- Message log -->
 	<section class="w-full max-w-xl">
 		<div class="flex items-center justify-between mb-3">
-			<h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Message Log</h2>
+			<h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Conversation Log</h2>
 			{#if $messageLog.length > 0}
 				<button
 					id="clear-log-button"
 					onclick={clearLog}
 					class="text-xs text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
 				>
-					Clear
+					Clear All
 				</button>
 			{/if}
 		</div>
@@ -174,23 +175,30 @@
 		>
 			{#if $messageLog.length === 0}
 				<p class="px-4 py-8 text-center text-sm text-gray-600">
-					No messages yet. Start recording to see results.
+					No messages yet. Start recording to begin a conversation.
 				</p>
 			{:else}
 				<ul class="divide-y divide-gray-800/60">
 					{#each $messageLog as msg, i (msg.timestamp + '-' + i)}
-						<li class="flex items-center gap-4 px-4 py-3 text-sm hover:bg-gray-800/30 transition-colors">
-							<span class="shrink-0 text-xs font-mono text-gray-600">
+						<li class="flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-800/30 transition-colors">
+							<span class="shrink-0 text-xs font-mono text-gray-600 mt-0.5">
 								{formatTime(msg.timestamp)}
 							</span>
-							<span class="text-gray-300 truncate">
-								"{msg.transcription || msg.mock_transcription || '…'}"
-							</span>
-							{#if msg.confidence != null}
-								<span class="ml-auto shrink-0 rounded-full bg-cyan-900/40 px-2 py-0.5 text-xs font-semibold text-cyan-300">
-									{((msg.confidence ?? 0) * 100).toFixed(0)}%
-								</span>
-							{/if}
+							<div class="min-w-0 flex-1">
+								{#if msg.type === 'transcription'}
+									<span class="text-indigo-300 font-medium">You:</span>
+									<span class="text-gray-300 ml-1">{msg.transcription}</span>
+								{:else if msg.type === 'llm_response'}
+									<span class="text-cyan-300 font-medium">Buddy:</span>
+									<span class="text-gray-300 ml-1">{msg.llm_text}</span>
+								{:else if msg.type === 'tts_audio'}
+									<span class="text-gray-500 italic">🔊 Audio played</span>
+								{:else if msg.type === 'error'}
+									<span class="text-red-400">⚠️ {msg.message}</span>
+								{:else}
+									<span class="text-gray-500">{msg.status}</span>
+								{/if}
+							</div>
 						</li>
 					{/each}
 				</ul>

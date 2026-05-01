@@ -16,10 +16,15 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # GPU / Model paths  (placeholders)
-    WHISPER_MODEL: str = "large-v3"
-    LLM_MODEL: str = "meta-llama/Meta-Llama-3-8B"
-    TTS_MODEL: str = "styletts2"
+    # GPU / Model paths
+    WHISPER_MODEL: str = "medium.en"
+
+    # LLM (LM Studio – OpenAI-compatible API)
+    LLM_BASE_URL: str = "http://localhost:1234/v1"
+    LLM_MODEL: str = "zai-org_glm-4.7-flash"
+
+    # TTS
+    TTS_VOICE: str = "en-US-AvaMultilingualNeural"
 
     # Audio settings
     SAMPLE_RATE: int = 16_000
