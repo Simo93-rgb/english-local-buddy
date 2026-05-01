@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # LLM (LM Studio – OpenAI-compatible API)
     LLM_BASE_URL: str = "http://localhost:1234/v1"
-    LLM_MODEL: str = "zai-org_glm-4.7-flash"
+    LLM_MODEL: str = 'google/gemma-4-e4b' #"zai-org_glm-4.7-flash"
 
     # TTS
     TTS_VOICE: str = "en-US-AvaMultilingualNeural"

@@ -181,6 +181,15 @@ async def websocket_audio(ws: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected.")
+    except RuntimeError as exc:
+        if "Cannot call \"receive\" once a disconnect message has been received" in str(exc):
+            logger.info("WebSocket client disconnected.")
+        else:
+            logger.error("Unexpected RuntimeError: %s", exc, exc_info=True)
+            try:
+                await ws.close(code=1011, reason="Internal server error")
+            except Exception:
+                pass
     except Exception as exc:
         logger.error("Unexpected WebSocket error: %s", exc, exc_info=True)
         try:

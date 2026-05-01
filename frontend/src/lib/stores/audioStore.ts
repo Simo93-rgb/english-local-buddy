@@ -100,6 +100,11 @@ function playAudioBase64(b64Data: string, format: string = 'mp3'): void {
 
 function connectWebSocket(): Promise<void> {
 	return new Promise((resolve, reject) => {
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			connectionStatus.set('connected');
+			return resolve();
+		}
+
 		connectionStatus.set('connecting');
 
 		ws = new WebSocket(WS_URL);
@@ -253,12 +258,6 @@ export function stopRecording(): void {
 		console.log('[audioStore] Sending STOP …');
 		currentWs.send('STOP');
 
-		// Close the WebSocket after the pipeline completes (status: "done")
-		// or after a generous timeout
-		const closeTimeout = setTimeout(() => {
-			disconnectWebSocket();
-		}, 60_000); // 60 s max for the full pipeline
-
 		const originalOnMessage = currentWs.onmessage;
 		currentWs.onmessage = (event: MessageEvent) => {
 			if (originalOnMessage) {
@@ -266,22 +265,14 @@ export function stopRecording(): void {
 			}
 			try {
 				const data = JSON.parse(event.data);
-				// Close WS when the pipeline is fully done
-				if (data.type === 'status' && data.status === 'done') {
-					clearTimeout(closeTimeout);
-					setTimeout(() => disconnectWebSocket(), 1000);
-				}
-				// Also close on error
-				if (data.type === 'error') {
-					clearTimeout(closeTimeout);
-					setTimeout(() => disconnectWebSocket(), 500);
-				}
+				// We no longer close the WebSocket when done.
+				// It remains open for the next conversation turn!
 			} catch {
 				// ignore parse errors
 			}
 		};
 	} else {
-		disconnectWebSocket();
+		connectionStatus.set('disconnected');
 	}
 }
 
