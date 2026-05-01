@@ -69,6 +69,7 @@ export const latestMessage = derived(messageLog, ($log) =>
 let ws: WebSocket | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let mediaStream: MediaStream | null = null;
+let chunkPromises: Promise<void>[] = [];
 
 const WS_URL = 'ws://localhost:8000/ws/audio';
 const CHUNK_INTERVAL_MS = 250;
@@ -200,9 +201,12 @@ async function startCapture(): Promise<void> {
 
 	mediaRecorder.ondataavailable = (event: BlobEvent) => {
 		if (event.data.size > 0 && ws?.readyState === WebSocket.OPEN) {
-			event.data.arrayBuffer().then((buffer) => {
-				ws?.send(buffer);
+			const p = event.data.arrayBuffer().then((buffer) => {
+				if (ws?.readyState === WebSocket.OPEN) {
+					ws.send(buffer);
+				}
 			});
+			chunkPromises.push(p);
 		}
 	};
 
@@ -210,17 +214,31 @@ async function startCapture(): Promise<void> {
 	console.log('[audioStore] MediaRecorder started');
 }
 
-function stopCapture() {
-	if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-		mediaRecorder.stop();
-	}
-	mediaRecorder = null;
+function stopCapture(): Promise<void> {
+	return new Promise((resolve) => {
+		if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+			cleanupStream();
+			return resolve();
+		}
 
+		mediaRecorder.onstop = async () => {
+			await Promise.all(chunkPromises);
+			chunkPromises = [];
+			cleanupStream();
+			console.log('[audioStore] MediaRecorder stopped and flushed');
+			resolve();
+		};
+
+		mediaRecorder.stop();
+	});
+}
+
+function cleanupStream() {
+	mediaRecorder = null;
 	if (mediaStream) {
 		mediaStream.getTracks().forEach((track) => track.stop());
 		mediaStream = null;
 	}
-	console.log('[audioStore] MediaRecorder stopped');
 }
 
 // ---------------------------------------------------------------------------
@@ -248,8 +266,8 @@ export async function startRecording(): Promise<void> {
  * Stop recording: stop mic → send STOP → keep WS open for the full
  * ASR → LLM → TTS pipeline response.
  */
-export function stopRecording(): void {
-	stopCapture();
+export async function stopRecording(): Promise<void> {
+	await stopCapture();
 	isRecording.set(false);
 
 	const currentWs = ws;
