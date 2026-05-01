@@ -51,7 +51,7 @@ class LLMManager:
     def __init__(
         self,
         base_url: str = "http://localhost:1234/v1",
-        model: str = "zai-org_glm-4.7-flash",
+        model: str = "google/gemma-4-e4b",
         max_context_turns: int = 5,
     ) -> None:
         self.model = model
@@ -105,13 +105,22 @@ class LLMManager:
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=150,  # Keep replies short
             )
 
-            assistant_text = response.choices[0].message.content.strip()
+            assistant_text = response.choices[0].message.content
+            assistant_text = assistant_text.strip() if assistant_text else ""
 
-            # Append assistant reply to history
-            self._history.append({"role": "assistant", "content": assistant_text})
+            # Handle models that output empty strings (e.g. Gemma template mismatches)
+            if not assistant_text:
+                logger.warning("LLM returned an empty response. Falling back to default message.")
+                assistant_text = "I'm sorry, I didn't quite catch that. Could you say it again?"
+                # Do NOT append empty/fallback text to the history to avoid breaking the prompt template
+                # We also remove the user's last message so they can just repeat it naturally
+                if self._history and self._history[-1]["role"] == "user":
+                    self._history.pop()
+            else:
+                # Append valid assistant reply to history
+                self._history.append({"role": "assistant", "content": assistant_text})
 
             logger.info("LLM response: %s", assistant_text[:80])
             return assistant_text
