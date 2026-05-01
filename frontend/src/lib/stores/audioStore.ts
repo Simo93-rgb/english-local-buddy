@@ -3,6 +3,13 @@
  * =========================================================
  * Handles microphone capture via the Web Audio API (MediaRecorder)
  * and streams audio chunks over a WebSocket to the Python backend.
+ *
+ * Flow:
+ *   1. User clicks "Start" → WebSocket connects → MediaRecorder starts
+ *   2. Audio chunks (WebM/Opus, ~250 ms) are streamed as binary frames
+ *   3. User clicks "Stop" → MediaRecorder stops → text "STOP" sent to backend
+ *   4. Backend transcribes the accumulated audio and returns JSON
+ *   5. WebSocket is closed after the response is received
  */
 
 import { writable, derived, get } from 'svelte/store';
@@ -13,12 +20,19 @@ import { writable, derived, get } from 'svelte/store';
 
 export interface WSMessage {
 	status: string;
+	transcription?: string;
+	confidence?: number;
+	language?: string;
+	segments?: Array<{ start: number; end: number; text: string; avg_logprob: number }>;
+	gop_score?: number | null;
+	message?: string;
+	// Legacy mock fields (kept for backwards compatibility)
 	mock_transcription?: string;
 	mock_gop_score?: number;
 	timestamp: number;
 }
 
-type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'transcribing' | 'error';
 
 // ---------------------------------------------------------------------------
 // Stores
@@ -45,7 +59,6 @@ export const latestMessage = derived(messageLog, ($log) =>
 let ws: WebSocket | null = null;
 let mediaRecorder: MediaRecorder | null = null;
 let mediaStream: MediaStream | null = null;
-let chunkInterval: ReturnType<typeof setInterval> | null = null;
 
 const WS_URL = 'ws://localhost:8000/ws/audio';
 const CHUNK_INTERVAL_MS = 250;
@@ -73,6 +86,11 @@ function connectWebSocket(): Promise<void> {
 					timestamp: Date.now(),
 				};
 				messageLog.update((log) => [...log, data]);
+
+				// If we got a transcription result back, we can close the socket
+				if (data.status === 'ok' || data.status === 'empty' || data.status === 'error') {
+					connectionStatus.set('connected');
+				}
 			} catch (err) {
 				console.error('[audioStore] Failed to parse WS message:', err);
 			}
@@ -169,12 +187,41 @@ export async function startRecording(): Promise<void> {
 }
 
 /**
- * Stop recording: stop microphone → close WebSocket.
+ * Stop recording: stop microphone → send STOP command → wait for
+ * the transcription result, then close the WebSocket.
  */
 export function stopRecording(): void {
+	// 1. Stop the microphone immediately
 	stopCapture();
-	disconnectWebSocket();
 	isRecording.set(false);
+
+	// 2. Tell the backend to transcribe the buffered audio
+	if (ws && ws.readyState === WebSocket.OPEN) {
+		connectionStatus.set('transcribing');
+		console.log('[audioStore] Sending STOP command …');
+		ws.send('STOP');
+
+		// 3. Give the backend time to respond, then close
+		//    (the onmessage handler will log the result)
+		//    Close after a generous timeout to handle slow transcriptions
+		const closeTimeout = setTimeout(() => {
+			disconnectWebSocket();
+		}, 30_000); // 30 s max wait
+
+		// If we receive a message, close sooner
+		const originalOnMessage = ws.onmessage;
+		ws.onmessage = (event: MessageEvent) => {
+			// Process the message with the original handler
+			if (originalOnMessage) {
+				originalOnMessage.call(ws, event);
+			}
+			// Close after receiving the transcription result
+			clearTimeout(closeTimeout);
+			setTimeout(() => disconnectWebSocket(), 500);
+		};
+	} else {
+		disconnectWebSocket();
+	}
 }
 
 /**

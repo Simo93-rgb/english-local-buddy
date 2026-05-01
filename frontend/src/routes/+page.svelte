@@ -51,9 +51,11 @@
 					? 'bg-emerald-900/50 text-emerald-300'
 					: $connectionStatus === 'connecting'
 						? 'bg-amber-900/50 text-amber-300'
-						: $connectionStatus === 'error'
-							? 'bg-red-900/50 text-red-300'
-							: 'bg-gray-800 text-gray-400'}"
+						: $connectionStatus === 'transcribing'
+							? 'bg-violet-900/50 text-violet-300'
+							: $connectionStatus === 'error'
+								? 'bg-red-900/50 text-red-300'
+								: 'bg-gray-800 text-gray-400'}"
 		>
 			<span
 				class="h-2 w-2 rounded-full
@@ -61,9 +63,11 @@
 						? 'bg-emerald-400 animate-pulse'
 						: $connectionStatus === 'connecting'
 							? 'bg-amber-400 animate-pulse'
-							: $connectionStatus === 'error'
-								? 'bg-red-400'
-								: 'bg-gray-500'}"
+							: $connectionStatus === 'transcribing'
+								? 'bg-violet-400 animate-pulse'
+								: $connectionStatus === 'error'
+									? 'bg-red-400'
+									: 'bg-gray-500'}"
 			></span>
 			{$connectionStatus}
 		</span>
@@ -104,7 +108,11 @@
 	</button>
 
 	<p class="mb-8 text-sm text-gray-500">
-		{$isRecording ? 'Recording… click to stop' : 'Click to start recording'}
+		{$isRecording
+			? 'Recording… click to stop'
+			: $connectionStatus === 'transcribing'
+				? 'Transcribing audio…'
+				: 'Click to start recording'}
 	</p>
 
 	<!-- Error banner -->
@@ -118,23 +126,28 @@
 	{#if $latestMessage}
 		<div class="mb-8 w-full max-w-xl rounded-2xl border border-gray-800 bg-gray-900/60 backdrop-blur p-6">
 			<h2 class="text-lg font-semibold text-gray-200 mb-4">Latest Result</h2>
-			<div class="grid grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 gap-4">
 				<div>
 					<p class="text-xs text-gray-500 uppercase tracking-wider">Transcription</p>
 					<p class="mt-1 text-xl font-medium text-white">
-						{$latestMessage.mock_transcription ?? '—'}
+						{$latestMessage.transcription || $latestMessage.mock_transcription || '—'}
 					</p>
 				</div>
-				<div>
-					<p class="text-xs text-gray-500 uppercase tracking-wider">GOP Score</p>
-					<p class="mt-1 text-xl font-bold
-						{($latestMessage.mock_gop_score ?? 0) >= 80
-							? 'text-emerald-400'
-							: ($latestMessage.mock_gop_score ?? 0) >= 50
-								? 'text-amber-400'
-								: 'text-red-400'}">
-						{$latestMessage.mock_gop_score ?? '—'}
-					</p>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<p class="text-xs text-gray-500 uppercase tracking-wider">Confidence</p>
+						<p class="mt-1 text-lg font-semibold text-cyan-400">
+							{$latestMessage.confidence != null
+								? (($latestMessage.confidence ?? 0) * 100).toFixed(1) + '%'
+								: '—'}
+						</p>
+					</div>
+					<div>
+						<p class="text-xs text-gray-500 uppercase tracking-wider">GOP Score</p>
+						<p class="mt-1 text-lg font-semibold text-gray-500">
+							{$latestMessage.gop_score ?? 'N/A'}
+						</p>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -170,12 +183,14 @@
 							<span class="shrink-0 text-xs font-mono text-gray-600">
 								{formatTime(msg.timestamp)}
 							</span>
-							<span class="text-gray-300">
-								"{msg.mock_transcription}"
+							<span class="text-gray-300 truncate">
+								"{msg.transcription || msg.mock_transcription || '…'}"
 							</span>
-							<span class="ml-auto shrink-0 rounded-full bg-indigo-900/40 px-2 py-0.5 text-xs font-semibold text-indigo-300">
-								GOP {msg.mock_gop_score}
-							</span>
+							{#if msg.confidence != null}
+								<span class="ml-auto shrink-0 rounded-full bg-cyan-900/40 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+									{((msg.confidence ?? 0) * 100).toFixed(0)}%
+								</span>
+							{/if}
 						</li>
 					{/each}
 				</ul>
