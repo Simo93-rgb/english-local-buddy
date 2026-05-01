@@ -1,0 +1,57 @@
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env
+*.log
+
+# ========================
+# Node / Frontend
+# ========================
+node_modules/
+.pnpm-store/
+.svelte-kit/
+build/
+dist/
+
+# ========================
+# Rust / Tauri
+# ========================
+target/
+*.rs.bk
+
+# ========================
+# Tauri
+# ========================
+frontend/src-tauri/target/
+frontend/src-tauri/WixTools/
+frontend/src-tauri/Frameworks/
+
+# ========================
+# IDE / OS
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ========================
+# Miscellaneous
+# ========================
+*.bak
+*.tmp
+*.cache
