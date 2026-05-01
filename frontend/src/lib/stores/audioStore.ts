@@ -196,10 +196,11 @@ export function stopRecording(): void {
 	isRecording.set(false);
 
 	// 2. Tell the backend to transcribe the buffered audio
-	if (ws && ws.readyState === WebSocket.OPEN) {
+	const currentWs = ws;
+	if (currentWs && currentWs.readyState === WebSocket.OPEN) {
 		connectionStatus.set('transcribing');
 		console.log('[audioStore] Sending STOP command …');
-		ws.send('STOP');
+		currentWs.send('STOP');
 
 		// 3. Give the backend time to respond, then close
 		//    (the onmessage handler will log the result)
@@ -209,11 +210,11 @@ export function stopRecording(): void {
 		}, 30_000); // 30 s max wait
 
 		// If we receive a message, close sooner
-		const originalOnMessage = ws.onmessage;
-		ws.onmessage = (event: MessageEvent) => {
+		const originalOnMessage = currentWs.onmessage;
+		currentWs.onmessage = (event: MessageEvent) => {
 			// Process the message with the original handler
 			if (originalOnMessage) {
-				originalOnMessage.call(ws, event);
+				originalOnMessage.call(currentWs, event);
 			}
 			// Close after receiving the transcription result
 			clearTimeout(closeTimeout);
