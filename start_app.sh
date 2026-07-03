@@ -58,7 +58,21 @@ cd "$BACKEND_DIR"
 
 # Verify virtual environment path validity (handles project relocation)
 if [ -d ".venv" ]; then
-    if ! .venv/bin/python --version >/dev/null 2>&1; then
+    if ! python3 -c "
+import sys, os
+from pathlib import Path
+activate_file = Path('.venv/bin/activate')
+if not activate_file.exists():
+    sys.exit(1)
+content = activate_file.read_text(encoding='utf-8')
+for line in content.splitlines():
+    if line.startswith('VIRTUAL_ENV='):
+        env_path = line.split('=', 1)[1].strip('\"\'')
+        expected_path = str(Path('.venv').resolve())
+        if os.path.normpath(env_path) != os.path.normpath(expected_path):
+            sys.exit(1)
+        break
+" 2>/dev/null; then
         echo -e "${YELLOW}Virtual environment .venv is broken (likely due to project relocation). Recreating...${NC}"
         rm -rf .venv
     fi
