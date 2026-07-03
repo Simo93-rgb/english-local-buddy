@@ -6,6 +6,7 @@ AGENTS.md
 .directory
 plan*.md
 todo.md
+backend/user_history/*
 # ========================
 # Python
 # ========================

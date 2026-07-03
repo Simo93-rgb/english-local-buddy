@@ -1,16 +1,16 @@
 # Graph Report - English Buddy  (2026-07-03)
 
 ## Corpus Check
-- 37 files · ~36,292 words
+- 39 files · ~37,396 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 731 nodes · 911 edges · 110 communities (104 shown, 6 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 17 edges (avg confidence: 0.76)
+- 751 nodes · 940 edges · 114 communities (107 shown, 7 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 20 edges (avg confidence: 0.74)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bdb96bf6`
+- Built from commit: `3b1b29bd`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -59,6 +59,7 @@
 - [[_COMMUNITY_Community 49|Community 49]]
 - [[_COMMUNITY_Community 50|Community 50]]
 - [[_COMMUNITY_Community 51|Community 51]]
+- [[_COMMUNITY_Community 52|Community 52]]
 - [[_COMMUNITY_Community 53|Community 53]]
 - [[_COMMUNITY_Community 54|Community 54]]
 - [[_COMMUNITY_Community 55|Community 55]]
@@ -93,6 +94,7 @@
 - [[_COMMUNITY_Community 84|Community 84]]
 - [[_COMMUNITY_Community 85|Community 85]]
 - [[_COMMUNITY_Community 86|Community 86]]
+- [[_COMMUNITY_Community 87|Community 87]]
 - [[_COMMUNITY_Community 88|Community 88]]
 - [[_COMMUNITY_Community 89|Community 89]]
 - [[_COMMUNITY_Community 90|Community 90]]
@@ -117,6 +119,8 @@
 - [[_COMMUNITY_Community 109|Community 109]]
 - [[_COMMUNITY_Community 110|Community 110]]
 - [[_COMMUNITY_Community 111|Community 111]]
+- [[_COMMUNITY_Community 112|Community 112]]
+- [[_COMMUNITY_Community 113|Community 113]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `allow` - 76 edges
@@ -124,11 +128,11 @@
 3. `permissions` - 31 edges
 4. `permissions` - 30 edges
 5. `WhisperASR` - 12 edges
-6. `permissions` - 11 edges
-7. `compilerOptions` - 11 edges
-8. `LLMManager` - 10 edges
-9. `permissions` - 9 edges
-10. `GOPScorer` - 8 edges
+6. `HistoryManager` - 12 edges
+7. `permissions` - 11 edges
+8. `compilerOptions` - 11 edges
+9. `LLMManager` - 10 edges
+10. `lifespan()` - 9 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Frontend WebSocket Logic` --conceptually_related_to--> `connectWebSocket()`  [INFERRED]
@@ -152,19 +156,19 @@
 - **Tauri Desktop Application Bootstrap Flow** — src_main_main, src_lib_run, src_tauri_tauri_conf [INFERRED 0.85]
 - **Audio Recording and Streaming Control Flow** — stores_audiostore_togglerecording, stores_audiostore_startrecording, stores_audiostore_stoprecording, routes__page_handletoggle [INFERRED 0.95]
 
-## Communities (110 total, 6 thin omitted)
+## Communities (114 total, 7 thin omitted)
 
 ### Community 0 - "LLM Pipeline & TTS Manager"
-Cohesion: 0.22
-Nodes (5): LLMManager, LLM (Large Language Model) Module =================================== Conversati, Reset the conversation context., Manages conversation with a local LLM via LM Studio's     OpenAI-compatible API., Send the user's text to the LLM and return the assistant's reply.          The c
+Cohesion: 0.15
+Nodes (12): LLMManager, LLM (Large Language Model) Module =================================== Conversati, Reset the conversation context., Manages conversation with a local LLM via LM Studio's     OpenAI-compatible API., Send the user's text to the LLM and return the assistant's reply.          The c, ASR-LLM-TTS pipeline execution helper, Full conversational pipeline over a single WebSocket connection.      Protocol, Execute the full ASR → LLM → TTS pipeline and send results     back over the Web (+4 more)
 
 ### Community 1 - "Tauri Desktop Capabilities"
 Cohesion: 0.08
 Nodes (24): description, identifier, permissions, $schema, windows, debugApplicationIdSuffix, app, security (+16 more)
 
 ### Community 2 - "Pronunciation Assessment & GOP"
-Cohesion: 0.10
-Nodes (17): calculate_gop(), ForcedAligner, GOPScorer, Pronunciation Assessment Module ================================= Stubs for Forc, # TODO: Implement GOP scoring, High-level function: run forced alignment on raw audio bytes.      Parameters, # TODO: Implement Montreal Forced Aligner here, High-level function: compute Goodness-of-Pronunciation scores.      Parameters (+9 more)
+Cohesion: 0.20
+Nodes (10): calculate_gop(), Pronunciation Assessment Module ================================= Stubs for Forc, # TODO: Implement GOP scoring, High-level function: run forced alignment on raw audio bytes.      Parameters, # TODO: Implement Montreal Forced Aligner here, High-level function: compute Goodness-of-Pronunciation scores.      Parameters, # TODO: Implement full GOP pipeline, # TODO: Implement Montreal Forced Aligner here (+2 more)
 
 ### Community 3 - "Frontend WebSocket Audio Store"
 Cohesion: 0.07
@@ -179,12 +183,12 @@ Cohesion: 0.14
 Nodes (9): ASR (Automatic Speech Recognition) Module ======================================, Synchronous transcription (runs on the thread pool).          Parameters, Decode raw audio bytes and transcribe asynchronously.          This method decod, GPU-accelerated ASR engine backed by faster-whisper (CTranslate2).      Paramete, Load the faster-whisper model into VRAM.         Call once at application startu, Release model resources and free VRAM., Decode WebM/Opus audio bytes (from MediaRecorder) into a         16 kHz mono flo, WhisperASR (+1 more)
 
 ### Community 6 - "Audio Processing Utilities"
-Cohesion: 0.10
-Nodes (23): ndarray, BaseModel, compute_energy(), extract_pitch_contour(), Audio processing utilities. Stubs for librosa / parselmouth helper functions use, Resample raw audio bytes to the target sample rate.      Parameters     --------, Extract the fundamental frequency (F0) contour from an audio buffer     using Pa, # TODO: Implement pitch extraction with parselmouth (+15 more)
+Cohesion: 0.18
+Nodes (11): ndarray, compute_energy(), extract_pitch_contour(), Audio processing utilities. Stubs for librosa / parselmouth helper functions use, Resample raw audio bytes to the target sample rate.      Parameters     --------, Extract the fundamental frequency (F0) contour from an audio buffer     using Pa, # TODO: Implement pitch extraction with parselmouth, Compute short-time energy of an audio signal.      Parameters     ---------- (+3 more)
 
 ### Community 7 - "Pipeline Data Models"
 Cohesion: 0.05
-Nodes (41): commands, description, identifier, commands, description, identifier, commands, description (+33 more)
+Nodes (44): commands, description, identifier, commands, description, identifier, commands, description (+36 more)
 
 ### Community 8 - "Frontend TypeScript Configuration"
 Cohesion: 0.15
@@ -196,7 +200,7 @@ Nodes (36): commands, description, identifier, commands, description, identifier
 
 ### Community 10 - "Frontend NPM Scripts"
 Cohesion: 0.19
-Nodes (16): core, default_permission, default_permission, default_permission, global_scope_schema, core:image, default_permission, global_scope_schema (+8 more)
+Nodes (16): core, core:app, default_permission, global_scope_schema, permission_sets, default_permission, default_permission, global_scope_schema (+8 more)
 
 ### Community 11 - "Backend Settings Configuration"
 Cohesion: 0.33
@@ -215,8 +219,8 @@ Cohesion: 0.15
 Nodes (13): definitions, Number, PermissionEntry, Target, Value, anyOf, description, anyOf (+5 more)
 
 ### Community 19 - "OpenCode Graphify Plugin"
-Cohesion: 0.20
-Nodes (9): ASR-LLM-TTS pipeline execution helper, English Buddy documentation roadmap, Architecture, Backend, English Buddy – Local Pronunciation Trainer, Frontend, Getting Started, Prerequisites (+1 more)
+Cohesion: 0.25
+Nodes (7): Architecture, Backend, English Buddy – Local Pronunciation Trainer, Frontend, Getting Started, Prerequisites, Project Structure
 
 ### Community 24 - "Empty Response Handling"
 Cohesion: 0.20
@@ -247,12 +251,12 @@ Cohesion: 0.25
 Nodes (8): health_check(), lifespan(), English Buddy – FastAPI Backend ================================ Main entrypoint, Simple liveness probe., FastAPI lifespan handler.     Load heavy ML models on startup, release on shutdo, Backend python package requirements, Backend service launch script, FastAPI
 
 ### Community 37 - "Community 37"
-Cohesion: 0.25
-Nodes (8): description, identifier, commands, description, identifier, permissions, allow-append, allow-set-as-help-menu-for-nsapp
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-get
 
 ### Community 38 - "Community 38"
-Cohesion: 0.25
-Nodes (8): core:app, global_scope_schema, permission_sets, permissions, commands, description, identifier, deny-identifier
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, deny-identifier
 
 ### Community 39 - "Community 39"
 Cohesion: 0.25
@@ -279,24 +283,24 @@ Cohesion: 0.40
 Nodes (5): start_app.sh script, GDK_BACKEND, LD_LIBRARY_PATH, PYTHONPATH, stop_app()
 
 ### Community 45 - "Community 45"
-Cohesion: 0.20
-Nodes (10): commands, description, identifier, commands, deny, commands, description, identifier (+2 more)
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-default-window-icon
 
 ### Community 46 - "Community 46"
 Cohesion: 0.50
-Nodes (5): Full conversational pipeline over a single WebSocket connection.      Protocol, Execute the full ASR → LLM → TTS pipeline and send results     back over the Web, _run_pipeline(), websocket_audio(), WebSocket
+Nodes (4): commands, description, identifier, allow-remove-at
 
 ### Community 47 - "Community 47"
 Cohesion: 0.40
 Nodes (4): Building, Creating a project, Developing, sv
 
 ### Community 48 - "Community 48"
-Cohesion: 0.40
-Nodes (5): commands, description, identifier, allow, allow-app-hide
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-app-hide
 
 ### Community 49 - "Community 49"
-Cohesion: 0.40
-Nodes (4): anyOf, description, $schema, title
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-append
 
 ### Community 50 - "Community 50"
 Cohesion: 0.40
@@ -306,25 +310,29 @@ Nodes (4): anyOf, description, $schema, title
 Cohesion: 0.50
 Nodes (3): Available Documentation, English Buddy Documentation, How the App Works (Brief Overview)
 
+### Community 52 - "Community 52"
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, deny-append
+
 ### Community 53 - "Community 53"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-bundle-type
+Nodes (4): commands, description, identifier, deny-remove-listener
 
 ### Community 54 - "Community 54"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-create-default
+Cohesion: 0.25
+Nodes (8): commands, description, identifier, description, identifier, permissions, allow-create-default, allow-set-as-help-menu-for-nsapp
 
 ### Community 55 - "Community 55"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-default-window-icon
+Cohesion: 0.16
+Nodes (10): HistoryManager, History Manager – Progress tracking and conversation logging ===================, Append a single turn (user or assistant) to the session log file on disk., Analyse the session history and update the persistent user_report.md., Clean up memory resources associated with the session., Manages incremental conversation logging and progress report updates., Get the file path for the session's log file., Get the file path for the single persistent report. (+2 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-fetch-data-store-identifiers
 
 ### Community 57 - "Community 57"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-get
+Cohesion: 0.21
+Nodes (12): BaseModel, AudioChunkMeta, GOPResult, PhonemeScore, PipelineResponse, Pydantic schemas for request / response validation., Metadata that can optionally accompany an audio chunk., Result returned by the ASR module. (+4 more)
 
 ### Community 58 - "Community 58"
 Cohesion: 0.50
@@ -363,8 +371,8 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-register-listener
 
 ### Community 67 - "Community 67"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-remove-at
+Cohesion: 0.29
+Nodes (4): GOPScorer, Computes Goodness-of-Pronunciation scores at the phoneme level     using a Wav2V, Load the acoustic model for GOP computation., Compute GOP score for each aligned phoneme.          Parameters         --------
 
 ### Community 68 - "Community 68"
 Cohesion: 0.50
@@ -439,8 +447,12 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-app-hide
 
 ### Community 86 - "Community 86"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-app-show
+Cohesion: 0.25
+Nodes (8): description, identifier, permissions, commands, description, identifier, allow-bundle-type, deny-app-show
+
+### Community 87 - "Community 87"
+Cohesion: 0.40
+Nodes (3): ForcedAligner, Wrapper around Montreal Forced Aligner (MFA) for phoneme-level     time alignmen, Run forced alignment on an audio file given a transcript.          Parameters
 
 ### Community 88 - "Community 88"
 Cohesion: 0.50
@@ -488,11 +500,11 @@ Nodes (4): commands, description, identifier, deny-remove-data-store
 
 ### Community 99 - "Community 99"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-remove-listener
+Nodes (4): description, required, type, Capability
 
 ### Community 100 - "Community 100"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-set-app-theme
+Cohesion: 0.33
+Nodes (6): commands, allow, commands, description, identifier, deny-set-app-theme
 
 ### Community 101 - "Community 101"
 Cohesion: 0.50
@@ -511,8 +523,8 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-version
 
 ### Community 105 - "Community 105"
-Cohesion: 0.50
-Nodes (4): description, required, type, Capability
+Cohesion: 0.40
+Nodes (4): anyOf, description, $schema, title
 
 ### Community 106 - "Community 106"
 Cohesion: 0.50
@@ -527,8 +539,8 @@ Cohesion: 0.50
 Nodes (4): default, description, type, description
 
 ### Community 109 - "Community 109"
-Cohesion: 0.67
-Nodes (3): Identifier, description, oneOf
+Cohesion: 0.33
+Nodes (6): commands, description, identifier, commands, deny, allow-app-show
 
 ### Community 110 - "Community 110"
 Cohesion: 0.67
@@ -538,25 +550,29 @@ Nodes (3): Identifier, description, oneOf
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-insert
 
+### Community 112 - "Community 112"
+Cohesion: 0.67
+Nodes (3): Identifier, description, oneOf
+
 ## Knowledge Gaps
-- **335 isolated node(s):** `Config`, `start.sh script`, `LD_LIBRARY_PATH`, `name`, `private` (+330 more)
+- **336 isolated node(s):** `Config`, `start.sh script`, `LD_LIBRARY_PATH`, `name`, `private` (+331 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `allow` connect `Community 48` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 45`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 111`?**
-  _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `deny` connect `Community 45` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 48`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 111`?**
-  _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `permissions` connect `Community 37` to `Pipeline Data Models`, `Frontend NPM Scripts`, `Community 45`, `Community 54`, `Community 57`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 64`, `Community 65`, `Community 67`, `Community 68`, `Community 71`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 78`, `Community 79`, `Community 80`, `Community 83`, `Community 89`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 111`?**
-  _High betweenness centrality (0.029) - this node is a cross-community bridge._
+- **Why does `allow` connect `Community 100` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 45`, `Community 46`, `Community 48`, `Community 49`, `Community 52`, `Community 53`, `Community 54`, `Community 56`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 109`, `Community 111`?**
+  _High betweenness centrality (0.065) - this node is a cross-community bridge._
+- **Why does `deny` connect `Community 109` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 45`, `Community 46`, `Community 48`, `Community 49`, `Community 52`, `Community 53`, `Community 54`, `Community 56`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 111`?**
+  _High betweenness centrality (0.065) - this node is a cross-community bridge._
+- **Why does `permissions` connect `Community 54` to `Pipeline Data Models`, `Frontend NPM Scripts`, `Community 37`, `Community 46`, `Community 49`, `Community 52`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 64`, `Community 65`, `Community 68`, `Community 71`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 78`, `Community 79`, `Community 80`, `Community 83`, `Community 89`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 111`?**
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
 - **What connects `ASR (Automatic Speech Recognition) Module ======================================`, `GPU-accelerated ASR engine backed by faster-whisper (CTranslate2).      Paramete`, `Load the faster-whisper model into VRAM.         Call once at application startu` to the rest of the system?**
-  _381 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _390 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Tauri Desktop Capabilities` be split into smaller, more focused modules?**
   _Cohesion score 0.07692307692307693 - nodes in this community are weakly interconnected._
-- **Should `Pronunciation Assessment & GOP` be split into smaller, more focused modules?**
-  _Cohesion score 0.09881422924901186 - nodes in this community are weakly interconnected._
 - **Should `Frontend WebSocket Audio Store` be split into smaller, more focused modules?**
   _Cohesion score 0.0748663101604278 - nodes in this community are weakly interconnected._
+- **Should `Frontend Package Dependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.07407407407407407 - nodes in this community are weakly interconnected._
