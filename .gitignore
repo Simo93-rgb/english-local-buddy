@@ -1,3 +1,11 @@
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
+.agents/*
+.opencode/*
+AGENTS.md
+.directory
+plan*.md
+todo.md
 # ========================
 # Python
 # ========================

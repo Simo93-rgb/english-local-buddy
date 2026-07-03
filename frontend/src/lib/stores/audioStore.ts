@@ -71,7 +71,8 @@ let mediaRecorder: MediaRecorder | null = null;
 let mediaStream: MediaStream | null = null;
 let chunkPromises: Promise<void>[] = [];
 
-const WS_URL = 'ws://localhost:8000/ws/audio';
+// WS_URL is evaluated dynamically when connectWebSocket is called
+let WS_URL = 'ws://localhost:8000/ws/audio';
 const CHUNK_INTERVAL_MS = 250;
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,12 @@ function connectWebSocket(): Promise<void> {
 
 		connectionStatus.set('connecting');
 
+		if (typeof window !== 'undefined') {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			// Since we set up a Vite proxy in vite.config.ts, we can just point to the same host
+			WS_URL = `${protocol}//${window.location.host}/ws/audio`;
+		}
+		
 		ws = new WebSocket(WS_URL);
 
 		ws.onopen = () => {
