@@ -180,7 +180,7 @@ function connectWebSocket(): Promise<void> {
 	});
 }
 
-function disconnectWebSocket() {
+export function disconnectWebSocket() {
 	if (ws) {
 		ws.close();
 		ws = null;

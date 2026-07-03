@@ -7,17 +7,28 @@
 		latestLLMResponse,
 		toggleRecording,
 		clearLog,
+		disconnectWebSocket,
 	} from '$lib/stores/audioStore';
 
 	let error = $state<string | null>(null);
+	let reportMessage = $state<string | null>(null);
 
 	async function handleToggle() {
 		error = null;
+		reportMessage = null;
 		try {
 			await toggleRecording();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to start recording';
 		}
+	}
+
+	function handleDisconnect() {
+		disconnectWebSocket();
+		reportMessage = "Session ended. Your progress report has been updated in 'user_history/user_report.md'.";
+		setTimeout(() => {
+			reportMessage = null;
+		}, 10000);
 	}
 
 	function formatTime(timestamp: number): string {
@@ -73,12 +84,22 @@
 		<p class="mt-2 text-gray-400 text-sm">Local Pronunciation Trainer</p>
 	</header>
 
-	<!-- Connection status badge -->
-	<div class="mb-6">
+	<!-- Connection status badge and controls -->
+	<div class="mb-6 flex items-center gap-3">
 		<span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium {statusColors[$connectionStatus] ?? 'bg-gray-800 text-gray-400'}">
 			<span class="h-2 w-2 rounded-full {dotColors[$connectionStatus] ?? 'bg-gray-500'}"></span>
 			{statusLabels[$connectionStatus] ?? $connectionStatus}
 		</span>
+
+		{#if $connectionStatus !== 'disconnected' && $connectionStatus !== 'error'}
+			<button
+				id="disconnect-button"
+				onclick={handleDisconnect}
+				class="text-xs px-3 py-1 bg-red-950/40 text-red-300 border border-red-900/50 hover:bg-red-900/30 transition-colors rounded-full cursor-pointer"
+			>
+				End Session
+			</button>
+		{/if}
 	</div>
 
 	<!-- Record button -->
@@ -128,6 +149,13 @@
 	{#if error}
 		<div class="mb-6 w-full max-w-xl rounded-lg border border-red-800 bg-red-950/50 px-4 py-3 text-sm text-red-300">
 			⚠️ {error}
+		</div>
+	{/if}
+
+	<!-- Success banner -->
+	{#if reportMessage}
+		<div class="mb-6 w-full max-w-xl rounded-lg border border-emerald-800 bg-emerald-950/50 px-4 py-3 text-sm text-emerald-300">
+			✅ {reportMessage}
 		</div>
 	{/if}
 
