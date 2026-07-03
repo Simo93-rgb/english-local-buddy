@@ -20,6 +20,7 @@ import base64
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +29,7 @@ from app.core.config import settings
 from app.ai_pipeline.asr import WhisperASR
 from app.ai_pipeline.llm import LLMManager
 from app.ai_pipeline.tts import TTSManager
+from app.core.history_manager import HistoryManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +40,7 @@ logger = logging.getLogger(__name__)
 asr_engine: WhisperASR | None = None
 llm_manager: LLMManager | None = None
 tts_manager: TTSManager | None = None
+history_manager: HistoryManager | None = None
 
 # Maximum buffer size before auto-flush (5 MB ≈ ~30 s WebM)
 MAX_BUFFER_BYTES = 5 * 1024 * 1024
@@ -49,7 +52,7 @@ async def lifespan(app: FastAPI):
     FastAPI lifespan handler.
     Load heavy ML models on startup, release on shutdown.
     """
-    global asr_engine, llm_manager, tts_manager
+    global asr_engine, llm_manager, tts_manager, history_manager
 
     # ---- Startup ----
     logger.info("Loading ASR model …")
@@ -72,6 +75,10 @@ async def lifespan(app: FastAPI):
     tts_manager = TTSManager(voice=settings.TTS_VOICE)
     logger.info("TTS manager ready.")
 
+    logger.info("Initialising History manager …")
+    history_manager = HistoryManager()
+    logger.info("History manager ready.")
+
     yield  # ← application runs here
 
     # ---- Shutdown ----
@@ -81,6 +88,7 @@ async def lifespan(app: FastAPI):
         asr_engine = None
     llm_manager = None
     tts_manager = None
+    history_manager = None
     logger.info("Cleanup complete.")
 
 
@@ -129,6 +137,10 @@ async def websocket_audio(ws: WebSocket):
     await ws.accept()
     logger.info("WebSocket client connected.")
 
+    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if history_manager:
+        await history_manager.start_session(session_id)
+
     audio_buffer = bytearray()
 
     try:
@@ -148,7 +160,7 @@ async def websocket_audio(ws: WebSocket):
                 # Auto-flush if buffer gets too large
                 if len(audio_buffer) >= MAX_BUFFER_BYTES:
                     logger.info("Buffer auto-flush at %d B", len(audio_buffer))
-                    await _run_pipeline(ws, audio_buffer)
+                    await _run_pipeline(ws, audio_buffer, session_id)
                     audio_buffer.clear()
 
             # --- Text frame: control message ------------------------------
@@ -165,7 +177,7 @@ async def websocket_audio(ws: WebSocket):
                         continue
 
                     logger.info("STOP – transcribing %d B", len(audio_buffer))
-                    await _run_pipeline(ws, audio_buffer)
+                    await _run_pipeline(ws, audio_buffer, session_id)
                     audio_buffer.clear()
 
                 elif text_msg == "CLEAR":
@@ -196,13 +208,22 @@ async def websocket_audio(ws: WebSocket):
             await ws.close(code=1011, reason="Internal server error")
         except Exception:
             pass
+    finally:
+        logger.info("WebSocket connection closed. Running final progress report update for session %s...", session_id)
+        if history_manager:
+            import asyncio
+            async def _run_final_update():
+                await history_manager.update_progress_report(session_id)
+                history_manager.cleanup_session_state(session_id)
+                logger.info("Progress report update finished for session %s.", session_id)
+            asyncio.create_task(_run_final_update())
 
 
 # ---------------------------------------------------------------------------
 # Pipeline helper
 # ---------------------------------------------------------------------------
 
-async def _run_pipeline(ws: WebSocket, buffer: bytearray) -> None:
+async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> None:
     """
     Execute the full ASR → LLM → TTS pipeline and send results
     back over the WebSocket.
@@ -247,6 +268,10 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray) -> None:
     if not transcription.strip():
         return
 
+    # Log user turn
+    if history_manager:
+        await history_manager.add_turn_incremental(session_id, "user", transcription)
+
     # ---- 2. LLM (Conversational response) --------------------------------
     if llm_manager is None:
         await ws.send_text(json.dumps({
@@ -271,6 +296,10 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray) -> None:
             "message": f"LLM request failed: {exc}",
         }))
         return
+
+    # Log partner turn
+    if history_manager and llm_response.strip():
+        await history_manager.add_turn_incremental(session_id, "assistant", llm_response)
 
     # Send the LLM text response
     await ws.send_text(json.dumps({
