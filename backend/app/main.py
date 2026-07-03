@@ -69,7 +69,7 @@ async def lifespan(app: FastAPI):
     logger.info("LLM manager ready.")
 
     logger.info("Initialising TTS manager …")
-    tts_manager = TTSManager()
+    tts_manager = TTSManager(voice=settings.TTS_VOICE)
     logger.info("TTS manager ready.")
 
     yield  # ← application runs here

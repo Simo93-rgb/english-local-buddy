@@ -32,7 +32,7 @@ class TTSManager:
         Edge TTS voice identifier.
     """
 
-    def __init__(self, voice: str = DEFAULT_VOICE) -> None:
+    def __init__(self, voice: str) -> None:
         self.voice = voice
         logger.info("TTSManager initialised (voice=%s)", voice)
 
