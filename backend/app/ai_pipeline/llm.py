@@ -50,8 +50,8 @@ class LLMManager:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:1234/v1",
-        model: str = "google/gemma-4-e4b",
+        base_url: str,
+        model: str,
         max_context_turns: int = 5,
     ) -> None:
         self.model = model
