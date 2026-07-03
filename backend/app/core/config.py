@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     SAMPLE_RATE: int = 16_000
     CHUNK_DURATION_MS: int = 250
 
+    # User History & Progress tracking settings
+    HISTORY_DIR: str = "user_history"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
