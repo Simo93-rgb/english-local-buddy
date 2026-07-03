@@ -36,16 +36,20 @@ stop_app() {
     # Kill backend on port 8000
     lsof -t -i:$BACKEND_PORT >/dev/null 2>&1 && fuser -k $BACKEND_PORT/tcp >/dev/null 2>&1 || true
     
-    # Kill tauri processes
+    # Kill frontend on port 1420
+    lsof -t -i:1420 >/dev/null 2>&1 && fuser -k 1420/tcp >/dev/null 2>&1 || true
+    
+    # Kill tauri/node/vite processes
     pkill -f "pnpm tauri" >/dev/null 2>&1 || true
     pkill -f "tauri" >/dev/null 2>&1 || true
+    pkill -f "vite" >/dev/null 2>&1 || true
     
     # Give it a second to release ports
     sleep 2
 }
 
 # Restart logic
-if lsof -t -i:$BACKEND_PORT >/dev/null 2>&1; then
+if lsof -t -i:$BACKEND_PORT >/dev/null 2>&1 || lsof -t -i:1420 >/dev/null 2>&1; then
     echo -e "${YELLOW}App is already running. Restarting...${NC}"
     stop_app
 else

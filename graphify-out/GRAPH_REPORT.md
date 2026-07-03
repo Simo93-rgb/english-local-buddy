@@ -1,16 +1,16 @@
 # Graph Report - English Buddy  (2026-07-03)
 
 ## Corpus Check
-- 37 files · ~36,223 words
+- 37 files · ~36,292 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 731 nodes · 911 edges · 111 communities (105 shown, 6 thin omitted)
+- 731 nodes · 911 edges · 110 communities (104 shown, 6 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 17 edges (avg confidence: 0.76)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bcebf8d1`
+- Built from commit: `bdb96bf6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -59,7 +59,6 @@
 - [[_COMMUNITY_Community 49|Community 49]]
 - [[_COMMUNITY_Community 50|Community 50]]
 - [[_COMMUNITY_Community 51|Community 51]]
-- [[_COMMUNITY_Community 52|Community 52]]
 - [[_COMMUNITY_Community 53|Community 53]]
 - [[_COMMUNITY_Community 54|Community 54]]
 - [[_COMMUNITY_Community 55|Community 55]]
@@ -94,7 +93,6 @@
 - [[_COMMUNITY_Community 84|Community 84]]
 - [[_COMMUNITY_Community 85|Community 85]]
 - [[_COMMUNITY_Community 86|Community 86]]
-- [[_COMMUNITY_Community 87|Community 87]]
 - [[_COMMUNITY_Community 88|Community 88]]
 - [[_COMMUNITY_Community 89|Community 89]]
 - [[_COMMUNITY_Community 90|Community 90]]
@@ -118,6 +116,7 @@
 - [[_COMMUNITY_Community 108|Community 108]]
 - [[_COMMUNITY_Community 109|Community 109]]
 - [[_COMMUNITY_Community 110|Community 110]]
+- [[_COMMUNITY_Community 111|Community 111]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `allow` - 76 edges
@@ -153,7 +152,7 @@
 - **Tauri Desktop Application Bootstrap Flow** — src_main_main, src_lib_run, src_tauri_tauri_conf [INFERRED 0.85]
 - **Audio Recording and Streaming Control Flow** — stores_audiostore_togglerecording, stores_audiostore_startrecording, stores_audiostore_stoprecording, routes__page_handletoggle [INFERRED 0.95]
 
-## Communities (111 total, 6 thin omitted)
+## Communities (110 total, 6 thin omitted)
 
 ### Community 0 - "LLM Pipeline & TTS Manager"
 Cohesion: 0.22
@@ -249,7 +248,7 @@ Nodes (8): health_check(), lifespan(), English Buddy – FastAPI Backend =======
 
 ### Community 37 - "Community 37"
 Cohesion: 0.25
-Nodes (8): commands, description, identifier, permissions, description, identifier, allow-set-as-help-menu-for-nsapp, deny-insert
+Nodes (8): description, identifier, commands, description, identifier, permissions, allow-append, allow-set-as-help-menu-for-nsapp
 
 ### Community 38 - "Community 38"
 Cohesion: 0.25
@@ -280,8 +279,8 @@ Cohesion: 0.40
 Nodes (5): start_app.sh script, GDK_BACKEND, LD_LIBRARY_PATH, PYTHONPATH, stop_app()
 
 ### Community 45 - "Community 45"
-Cohesion: 0.33
-Nodes (6): commands, description, identifier, deny, commands, allow-app-show
+Cohesion: 0.20
+Nodes (10): commands, description, identifier, commands, deny, commands, description, identifier (+2 more)
 
 ### Community 46 - "Community 46"
 Cohesion: 0.50
@@ -306,10 +305,6 @@ Nodes (4): anyOf, description, $schema, title
 ### Community 51 - "Community 51"
 Cohesion: 0.50
 Nodes (3): Available Documentation, English Buddy Documentation, How the App Works (Brief Overview)
-
-### Community 52 - "Community 52"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-append
 
 ### Community 53 - "Community 53"
 Cohesion: 0.50
@@ -447,10 +442,6 @@ Nodes (4): commands, description, identifier, deny-app-hide
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-app-show
 
-### Community 87 - "Community 87"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-append
-
 ### Community 88 - "Community 88"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-bundle-type
@@ -543,6 +534,10 @@ Nodes (3): Identifier, description, oneOf
 Cohesion: 0.67
 Nodes (3): Identifier, description, oneOf
 
+### Community 111 - "Community 111"
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, deny-insert
+
 ## Knowledge Gaps
 - **335 isolated node(s):** `Config`, `start.sh script`, `LD_LIBRARY_PATH`, `name`, `private` (+330 more)
   These have ≤1 connection - possible missing edges or undocumented components.
@@ -551,11 +546,11 @@ Nodes (3): Identifier, description, oneOf
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `allow` connect `Community 48` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 45`, `Community 52`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 87`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`?**
+- **Why does `allow` connect `Community 48` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 45`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 111`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `deny` connect `Community 45` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 48`, `Community 52`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 87`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`?**
+- **Why does `deny` connect `Community 45` to `Pipeline Data Models`, `App Architecture & Tauri Boot`, `Community 37`, `Community 38`, `Community 48`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 63`, `Community 64`, `Community 65`, `Community 66`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 71`, `Community 72`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 77`, `Community 78`, `Community 79`, `Community 80`, `Community 81`, `Community 82`, `Community 83`, `Community 84`, `Community 85`, `Community 86`, `Community 88`, `Community 89`, `Community 90`, `Community 91`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 96`, `Community 97`, `Community 98`, `Community 99`, `Community 100`, `Community 101`, `Community 102`, `Community 103`, `Community 104`, `Community 111`?**
   _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `permissions` connect `Community 37` to `Pipeline Data Models`, `Frontend NPM Scripts`, `Community 52`, `Community 54`, `Community 57`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 64`, `Community 65`, `Community 67`, `Community 68`, `Community 71`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 78`, `Community 79`, `Community 80`, `Community 83`, `Community 87`, `Community 89`, `Community 92`, `Community 93`, `Community 94`, `Community 95`?**
+- **Why does `permissions` connect `Community 37` to `Pipeline Data Models`, `Frontend NPM Scripts`, `Community 45`, `Community 54`, `Community 57`, `Community 59`, `Community 60`, `Community 61`, `Community 62`, `Community 64`, `Community 65`, `Community 67`, `Community 68`, `Community 71`, `Community 73`, `Community 74`, `Community 75`, `Community 76`, `Community 78`, `Community 79`, `Community 80`, `Community 83`, `Community 89`, `Community 92`, `Community 93`, `Community 94`, `Community 95`, `Community 111`?**
   _High betweenness centrality (0.029) - this node is a cross-community bridge._
 - **What connects `ASR (Automatic Speech Recognition) Module ======================================`, `GPU-accelerated ASR engine backed by faster-whisper (CTranslate2).      Paramete`, `Load the faster-whisper model into VRAM.         Call once at application startu` to the rest of the system?**
   _381 weakly-connected nodes found - possible documentation gaps or missing edges._
