@@ -34,22 +34,10 @@ Questo documento censisce le imperfezioni architetturali e i margini di migliora
 
 ---
 
-### 8. [BUG / DESIGN] Sintesi Vocale Bilingue TTS per Tutor Cinese (`tts.py`, `main.py`)
-- **Problema Riscontrato**: Quando il tutor cinese risponde, l'intero testo (contenente sia spiegazioni in italiano che parole/frasi in cinese con caratteri Hanzi e Pinyin) viene passato in blocco a un'unica voce Edge-TTS (`zh-CN-XiaoxiaoNeural`). La voce cinese applica fonetica e intonazione native al mandarino anche sulle frasi italiane, rendendo la spiegazione in italiano completamente incomprensibile e distorta.
-- **Obiettivo**: Fare parlare in italiano (con voce nativa italiana) la parte esplicativa e in cinese mandarino (con voce nativa cinese) esclusivamente i caratteri cinesi e le trascrizioni Pinyin.
-
-#### Bozza di Soluzione Architetturale (Starting Point):
-1. **Segmentazione del Testo (Polyglot Chunking)**:
-   - *Approccio Tag-based (Raccomandato per robustezza)*: Modificare il prompt del tutor (`chinese_tutor.md`) istruendo il modello a racchiudere le porzioni linguistiche in tag leggeri, ad esempio:
-     ```text
-     <it>Il modo più comune per salutare è</it> <zh>你好, nǐ hǎo</zh> <it>che significa ciao.</it>
-     ```
-   - *Approccio Regex/Unicode (Fallback o Alternativa)*: Individuare le sequenze di caratteri Hanzi (`[\u4e00-\u9fff]`) e relative parentesi con Pinyin, separando il flusso in token `("it", testo)` e `("zh", testo)`.
-2. **Generazione Vocale Multi-Voice**:
-   - Mappare i token alle voci dedicate:
-     - Segmenti `it` $\rightarrow$ `it-IT-ElsaNeural` o `it-IT-DiegoNeural` (o `it-IT-GiuseppeMultilingualNeural`).
-     - Segmenti `zh` $\rightarrow$ `zh-CN-XiaoxiaoNeural`.
-   - Eseguire le chiamate `edge_tts.Communicate` in parallelo con `asyncio.gather(...)` per minimizzare la latenza.
-3. **Concatenazione Audio**:
-   - I frame audio MP3 generati per ciascun segmento vengono concatenati in ordine sequenziale di apparizione (`b"".join(audio_chunks)`) prima dell'invio al frontend, restituendo un unico flusso audio continuo e naturale.
+### 8. [RISOLTO] Sintesi Vocale Bilingue TTS per Tutor Cinese (`tts.py`, `main.py`)
+- **Stato**: Risolto tramite approccio tag-based e sintesi multi-voice concorrente con voci esclusivamente femminili (`it-IT-ElsaNeural` per le spiegazioni in italiano e `zh-CN-XiaoxiaoNeural` per caratteri Hanzi e Pinyin).
+- **Implementazione**:
+  - Il prompt didattico `chinese_tutor.md` delimita le frasi con i tag `<it>...</it>` e `<zh>...</zh>`.
+  - Il modulo `tts.py` include `parse_language_tags`, `strip_language_tags` e il metodo asincrono concorrente `generate_polyglot_audio`.
+  - La pipeline in `main.py` invia l'audio continuo bilingue via WebSocket ripulendo i tag per il display a schermo nella UI frontend e nei log della cronologia.
 

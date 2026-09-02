@@ -28,7 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.ai_pipeline.asr import WhisperASR
 from app.ai_pipeline.llm import LLMManager, load_system_prompt
-from app.ai_pipeline.tts import TTSManager
+from app.ai_pipeline.tts import TTSManager, strip_language_tags
 from app.core.history_manager import HistoryManager
 
 logging.basicConfig(level=logging.INFO)
@@ -333,17 +333,17 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str, langu
             "status": "error",
             "message": f"LLM request failed: {exc}",
         }))
-        return
+    clean_llm_response = strip_language_tags(llm_response)
 
-    # Log partner turn
-    if history_manager and llm_response.strip():
-        await history_manager.add_turn_incremental(session_id, "assistant", llm_response)
+    # Log partner turn (cleaned of tags)
+    if history_manager and clean_llm_response.strip():
+        await history_manager.add_turn_incremental(session_id, "assistant", clean_llm_response)
 
-    # Send the LLM text response
+    # Send the LLM text response (cleaned of tags)
     await ws.send_text(json.dumps({
         "type": "llm_response",
         "status": "ok",
-        "llm_text": llm_response,
+        "llm_text": clean_llm_response,
         "language": language,
     }))
 
@@ -357,8 +357,7 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str, langu
     }))
 
     try:
-        target_voice = tts_manager.get_voice_for_language(language)
-        audio_bytes = await tts_manager.generate_audio(llm_response, voice=target_voice)
+        audio_bytes = await tts_manager.generate_polyglot_audio(llm_response, default_language=language)
     except Exception as exc:
         logger.error("TTS failed: %s", exc, exc_info=True)
         await ws.send_text(json.dumps({

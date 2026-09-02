@@ -43,9 +43,10 @@ class Settings(BaseSettings):
     SYSTEM_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "english_partner.md")
     CHINESE_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor.md")
 
-    # TTS
+    # TTS (all female voices)
     TTS_VOICE: str = "en-US-AvaMultilingualNeural"
     TTS_VOICE_ZH: str = "zh-CN-XiaoxiaoNeural"
+    TTS_VOICE_IT: str = "it-IT-ElsaNeural"
 
     # Audio settings
     SAMPLE_RATE: int = 16_000
