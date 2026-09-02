@@ -68,6 +68,8 @@ async def lifespan(app: FastAPI):
     llm_manager = LLMManager(
         base_url=settings.LLM_BASE_URL,
         model=settings.LLM_MODEL,
+        api_key=settings.LLM_API_KEY,
+        prompt_path=settings.SYSTEM_PROMPT_PATH,
     )
     logger.info("LLM manager ready.")
 

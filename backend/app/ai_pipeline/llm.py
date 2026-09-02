@@ -1,23 +1,16 @@
-"""
-LLM (Large Language Model) Module
-===================================
-Conversational English partner powered by a local LLM via
-LM Studio's OpenAI-compatible API (http://localhost:1234/v1).
-"""
-
 from __future__ import annotations
 
 import logging
 from collections import deque
+from pathlib import Path
 
 from openai import AsyncOpenAI
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# System prompt – instructs the LLM to be a concise English conversation partner
-# ---------------------------------------------------------------------------
-SYSTEM_PROMPT = """\
+# Fallback system prompt if markdown file cannot be read
+DEFAULT_SYSTEM_PROMPT = """\
 You are a friendly and encouraging English conversation partner.
 Your goal is to help the user practise speaking English naturally.
 
@@ -32,17 +25,34 @@ Rules:
 """
 
 
+def load_system_prompt(prompt_path: str | Path | None = None) -> str:
+    """Load system prompt from a markdown file with fallback to default."""
+    target_path = Path(prompt_path or settings.SYSTEM_PROMPT_PATH)
+    if target_path.exists():
+        try:
+            content = target_path.read_text(encoding="utf-8").strip()
+            if content:
+                return content
+        except Exception as exc:
+            logger.warning("Could not read prompt file %s: %s. Using default.", target_path, exc)
+    return DEFAULT_SYSTEM_PROMPT.strip()
+
+
 class LLMManager:
     """
-    Manages conversation with a local LLM via LM Studio's
-    OpenAI-compatible API.
+    Manages conversation with a local LLM via OpenAI-compatible API
+    (e.g., Unsloth Studio or LM Studio).
 
     Parameters
     ----------
-    base_url : str
-        LM Studio server URL (default ``http://localhost:1234/v1``).
-    model : str
-        Model identifier as listed by LM Studio.
+    base_url : str | None
+        LLM server URL (defaults to ``settings.LLM_BASE_URL``).
+    model : str | None
+        Model identifier (defaults to ``settings.LLM_MODEL``).
+    api_key : str | None
+        Bearer API token (defaults to ``settings.LLM_API_KEY``).
+    prompt_path : str | Path | None
+        Path to markdown system prompt (defaults to ``settings.SYSTEM_PROMPT_PATH``).
     max_context_turns : int
         Maximum number of recent user+assistant message pairs to keep
         in the rolling context window.
@@ -50,25 +60,42 @@ class LLMManager:
 
     def __init__(
         self,
-        base_url: str,
-        model: str,
+        base_url: str | None = None,
+        model: str | None = None,
+        api_key: str | None = None,
+        prompt_path: str | Path | None = None,
         max_context_turns: int = 5,
     ) -> None:
-        self.model = model
+        self.model = model or settings.LLM_MODEL
+        self.base_url = base_url or settings.LLM_BASE_URL
+        self.api_key = api_key or settings.LLM_API_KEY
+        self.prompt_path = prompt_path or settings.SYSTEM_PROMPT_PATH
         self.max_context_turns = max_context_turns
+
+        self._system_prompt = load_system_prompt(self.prompt_path)
         self._client = AsyncOpenAI(
-            base_url=base_url,
-            api_key="lm-studio",  # LM Studio doesn't check API keys
+            base_url=self.base_url,
+            api_key=self.api_key,
         )
         # Rolling context: stores the last N (user, assistant) message dicts
         self._history: deque[dict] = deque(maxlen=max_context_turns * 2)
 
         logger.info(
-            "LLMManager initialised (model=%s, base_url=%s, context=%d turns)",
-            model,
-            base_url,
+            "LLMManager initialised (model=%s, base_url=%s, prompt_path=%s, context=%d turns)",
+            self.model,
+            self.base_url,
+            self.prompt_path,
             max_context_turns,
         )
+
+    def reload_prompt(self) -> None:
+        """Reload system prompt from disk."""
+        self._system_prompt = load_system_prompt(self.prompt_path)
+        logger.info("Reloaded system prompt from %s", self.prompt_path)
+
+    def set_system_prompt(self, prompt: str) -> None:
+        """Set an explicit system prompt string."""
+        self._system_prompt = prompt.strip()
 
     # ------------------------------------------------------------------
     # Public API
@@ -96,7 +123,7 @@ class LLMManager:
 
         # Build the full message list: system + rolling history
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": self._system_prompt},
             *list(self._history),
         ]
 

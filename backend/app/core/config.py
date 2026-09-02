@@ -1,9 +1,22 @@
-"""
-Application configuration.
-Centralises environment variables and system-level settings.
-"""
-
+import json
+from pathlib import Path
+from pydantic import Field
 from pydantic_settings import BaseSettings
+
+
+def _get_unsloth_api_key() -> str:
+    """Attempt to read the minted agent API key from Unsloth Studio."""
+    key_path = Path.home() / ".unsloth" / "studio" / "auth" / "agent_api_key.json"
+    if key_path.exists():
+        try:
+            data = json.loads(key_path.read_text(encoding="utf-8"))
+            for _server, entry in data.get("servers", {}).items():
+                minted = entry.get("minted", [])
+                if minted:
+                    return minted[0]
+        except Exception:
+            pass
+    return "sk-unsloth-default"
 
 
 class Settings(BaseSettings):
@@ -19,9 +32,14 @@ class Settings(BaseSettings):
     # GPU / Model paths
     WHISPER_MODEL: str = "medium.en"
 
-    # LLM (LM Studio – OpenAI-compatible API)
-    LLM_BASE_URL: str = "http://localhost:1234/v1"
-    LLM_MODEL: str = "google/gemma-4-12b-qat"
+    # LLM (Unsloth Studio – OpenAI-compatible API)
+    LLM_BASE_URL: str = "http://127.0.0.1:8888/v1"
+    LLM_MODEL: str = "unsloth/gemma-4-12b-it-GGUF"
+    LLM_API_KEY: str = Field(default_factory=_get_unsloth_api_key)
+
+    # Prompts
+    PROMPT_DIR: str = str(Path(__file__).parent / "prompts")
+    SYSTEM_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "english_partner.md")
 
     # TTS
     TTS_VOICE: str = "en-US-AvaMultilingualNeural"

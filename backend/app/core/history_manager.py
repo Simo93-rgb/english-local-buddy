@@ -74,7 +74,7 @@ class HistoryManager:
         
         self.client = AsyncOpenAI(
             base_url=settings.LLM_BASE_URL,
-            api_key="lm-studio"
+            api_key=settings.LLM_API_KEY,
         )
         
         # In-memory turn counter to trigger periodic report updates (e.g. every 10 turns)
