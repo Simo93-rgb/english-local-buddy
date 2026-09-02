@@ -41,13 +41,15 @@ class WhisperASR:
 
     def __init__(
         self,
-        model_size: str = "medium.en",
+        model_size: str = "large-v3",
         device: str = "cuda",
         compute_type: str = "float16",
+        default_language: str | None = "en",
     ) -> None:
         self.model_size = model_size
         self.device = device
         self.compute_type = compute_type
+        self.default_language = default_language
         self._model: Any = None
 
     # ------------------------------------------------------------------
@@ -135,7 +137,7 @@ class WhisperASR:
     # Transcription
     # ------------------------------------------------------------------
 
-    def _transcribe_sync(self, audio_array: np.ndarray) -> dict:
+    def _transcribe_sync(self, audio_array: np.ndarray, language: str | None = None) -> dict:
         """
         Synchronous transcription (runs on the thread pool).
 
@@ -143,6 +145,8 @@ class WhisperASR:
         ----------
         audio_array : np.ndarray
             16 kHz mono float32 waveform.
+        language : str | None
+            Language code (e.g. "en", "zh", or None for auto-detect).
 
         Returns
         -------
@@ -152,9 +156,13 @@ class WhisperASR:
         if self._model is None:
             raise RuntimeError("Whisper model not loaded – call load_model() first.")
 
+        target_lang = self.default_language if language is None else language
+        if target_lang in ("auto", "None", ""):
+            target_lang = None
+
         segments_iter, info = self._model.transcribe(
             audio_array,
-            language="en",
+            language=target_lang,
             beam_size=5,
             vad_filter=True,          # skip silence
             vad_parameters=dict(
@@ -189,7 +197,7 @@ class WhisperASR:
             "segments": segments,
         }
 
-    async def transcribe_audio_bytes(self, audio_bytes: bytes) -> dict:
+    async def transcribe_audio_bytes(self, audio_bytes: bytes, language: str | None = None) -> dict:
         """
         Decode raw audio bytes and transcribe asynchronously.
 
@@ -202,6 +210,8 @@ class WhisperASR:
         ----------
         audio_bytes : bytes
             Raw audio data (any format ffmpeg can decode).
+        language : str | None
+            Optional language code ("en", "zh", etc.).
 
         Returns
         -------
@@ -216,11 +226,11 @@ class WhisperASR:
         audio_array = self._decode_webm_to_array(audio_bytes)
 
         if audio_array.size == 0:
-            return {"text": "", "confidence": 0.0, "language": "en", "segments": []}
+            return {"text": "", "confidence": 0.0, "language": language or self.default_language or "en", "segments": []}
 
         # Run CTranslate2 inference on the thread pool
         result = await loop.run_in_executor(
             _executor,
-            partial(self._transcribe_sync, audio_array),
+            partial(self._transcribe_sync, audio_array, language=language),
         )
         return result

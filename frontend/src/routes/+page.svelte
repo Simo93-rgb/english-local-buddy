@@ -8,6 +8,8 @@
 		toggleRecording,
 		clearLog,
 		disconnectWebSocket,
+		currentLanguage,
+		setLanguage,
 	} from '$lib/stores/audioStore';
 
 	let error = $state<string | null>(null);
@@ -71,18 +73,38 @@
 </script>
 
 <svelte:head>
-	<title>English Buddy – Pronunciation Trainer</title>
-	<meta name="description" content="Local AI-powered English pronunciation training app" />
+	<title>{$currentLanguage === 'zh' ? 'Chinese Buddy – Tutor Cinese Mandarino' : 'English Buddy – Pronunciation Trainer'}</title>
+	<meta name="description" content="Local AI-powered language training app" />
 </svelte:head>
 
 <main class="min-h-screen bg-gray-950 text-gray-100 flex flex-col items-center px-4 py-10">
 	<!-- Header -->
-	<header class="text-center mb-10">
-		<h1 class="text-4xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-			English Buddy
+	<header class="text-center mb-6">
+		<h1 class="text-4xl font-bold tracking-tight bg-gradient-to-r {$currentLanguage === 'zh' ? 'from-rose-400 via-amber-300 to-red-400' : 'from-indigo-400 to-cyan-400'} bg-clip-text text-transparent">
+			{$currentLanguage === 'zh' ? 'Chinese Buddy' : 'English Buddy'}
 		</h1>
-		<p class="mt-2 text-gray-400 text-sm">Local Pronunciation Trainer</p>
+		<p class="mt-2 text-gray-400 text-sm">
+			{$currentLanguage === 'zh' ? 'Tutor di Cinese Mandarino per Principianti (spiegazioni in italiano)' : 'Local Pronunciation & Conversation Trainer'}
+		</p>
 	</header>
+
+	<!-- Language Selector -->
+	<div class="mb-6 flex items-center bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800 shadow-inner">
+		<button
+			onclick={() => setLanguage('en')}
+			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'en' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-gray-400 hover:text-gray-200'}"
+		>
+			<span class="text-sm">🇬🇧</span>
+			<span>English</span>
+		</button>
+		<button
+			onclick={() => setLanguage('zh')}
+			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'zh' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30' : 'text-gray-400 hover:text-gray-200'}"
+		>
+			<span class="text-sm">🇨🇳</span>
+			<span>Cinese Mandarino</span>
+		</button>
+	</div>
 
 	<!-- Connection status badge and controls -->
 	<div class="mb-6 flex items-center gap-3">
@@ -116,7 +138,9 @@
 			class="relative flex h-20 w-20 items-center justify-center rounded-full transition-all duration-300
 				{$isRecording
 					? 'bg-red-600 shadow-lg shadow-red-600/40 hover:bg-red-500'
-					: 'bg-indigo-600 shadow-lg shadow-indigo-600/40 hover:bg-indigo-500'}"
+					: $currentLanguage === 'zh'
+						? 'bg-rose-600 shadow-lg shadow-rose-600/40 hover:bg-rose-500'
+						: 'bg-indigo-600 shadow-lg shadow-indigo-600/40 hover:bg-indigo-500'}"
 		>
 			{#if $isRecording}
 				<svg class="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -134,15 +158,17 @@
 	</button>
 
 	<p class="mb-8 text-sm text-gray-500">
-		{$isRecording
-			? 'Recording… click to stop'
-			: $connectionStatus === 'transcribing'
-				? 'Transcribing your audio…'
-				: $connectionStatus === 'thinking'
-					? 'Generating response…'
-					: $connectionStatus === 'speaking'
-						? '🔊 Playing response…'
-						: 'Click to start recording'}
+		{#if $isRecording}
+			{$currentLanguage === 'zh' ? 'Registrazione in corso… clicca per fermare' : 'Recording… click to stop'}
+		{:else if $connectionStatus === 'transcribing'}
+			{$currentLanguage === 'zh' ? 'Trascrizione audio in corso…' : 'Transcribing your audio…'}
+		{:else if $connectionStatus === 'thinking'}
+			{$currentLanguage === 'zh' ? 'Il tutor sta generando la risposta…' : 'Generating response…'}
+		{:else if $connectionStatus === 'speaking'}
+			{$currentLanguage === 'zh' ? '🔊 Riproduzione pronuncia e spiegazione…' : '🔊 Playing response…'}
+		{:else}
+			{$currentLanguage === 'zh' ? 'Clicca per parlare (parla in cinese o chiedi spiegazioni in italiano)' : 'Click to start recording'}
+		{/if}
 	</p>
 
 	<!-- Error banner -->
@@ -165,7 +191,9 @@
 		{#if $latestTranscription}
 			<div class="rounded-2xl border border-gray-800 bg-gray-900/60 backdrop-blur p-5">
 				<div class="flex items-center gap-2 mb-2">
-					<span class="text-xs font-semibold text-indigo-400 uppercase tracking-wider">You said</span>
+					<span class="text-xs font-semibold {$currentLanguage === 'zh' ? 'text-rose-400' : 'text-indigo-400'} uppercase tracking-wider">
+						{$currentLanguage === 'zh' ? 'Hai detto' : 'You said'}
+					</span>
 				</div>
 				<p class="text-lg text-white">{$latestTranscription}</p>
 			</div>
@@ -173,9 +201,11 @@
 
 		<!-- Bot's response -->
 		{#if $latestLLMResponse}
-			<div class="rounded-2xl border border-cyan-900/50 bg-cyan-950/30 backdrop-blur p-5">
+			<div class="rounded-2xl border {$currentLanguage === 'zh' ? 'border-rose-900/50 bg-rose-950/20' : 'border-cyan-900/50 bg-cyan-950/30'} backdrop-blur p-5">
 				<div class="flex items-center gap-2 mb-2">
-					<span class="text-xs font-semibold text-cyan-400 uppercase tracking-wider">🤖 Buddy</span>
+					<span class="text-xs font-semibold {$currentLanguage === 'zh' ? 'text-rose-300' : 'text-cyan-400'} uppercase tracking-wider">
+						{$currentLanguage === 'zh' ? '🇨🇳 Buddy (Tutor Cinese)' : '🤖 Buddy'}
+					</span>
 				</div>
 				<p class="text-lg text-gray-100">{$latestLLMResponse}</p>
 			</div>

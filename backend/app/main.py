@@ -27,7 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.ai_pipeline.asr import WhisperASR
-from app.ai_pipeline.llm import LLMManager
+from app.ai_pipeline.llm import LLMManager, load_system_prompt
 from app.ai_pipeline.tts import TTSManager
 from app.core.history_manager import HistoryManager
 
@@ -137,9 +137,10 @@ async def websocket_audio(ws: WebSocket):
     * **Text ``"CLEAR"``** → reset LLM conversation history.
     """
     await ws.accept()
-    logger.info("WebSocket client connected.")
+    current_language = ws.query_params.get("lang", settings.DEFAULT_LANGUAGE).strip().lower()
+    logger.info("WebSocket client connected (initial language=%s).", current_language)
 
-    session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{current_language}"
     if history_manager:
         await history_manager.start_session(session_id)
 
@@ -162,12 +163,32 @@ async def websocket_audio(ws: WebSocket):
                 # Auto-flush if buffer gets too large
                 if len(audio_buffer) >= MAX_BUFFER_BYTES:
                     logger.info("Buffer auto-flush at %d B", len(audio_buffer))
-                    await _run_pipeline(ws, audio_buffer, session_id)
+                    await _run_pipeline(ws, audio_buffer, session_id, language=current_language)
                     audio_buffer.clear()
 
             # --- Text frame: control message ------------------------------
             elif "text" in message and message["text"] is not None:
-                text_msg = message["text"].strip().upper()
+                raw_text = message["text"].strip()
+
+                # Check for JSON control messages (e.g. {"type": "SET_LANGUAGE", "language": "zh"})
+                if raw_text.startswith("{") and raw_text.endswith("}"):
+                    try:
+                        parsed = json.loads(raw_text)
+                        if parsed.get("type") == "SET_LANGUAGE":
+                            new_lang = str(parsed.get("language", "")).strip().lower()
+                            if new_lang:
+                                current_language = new_lang
+                                logger.info("Session %s switched language to: %s", session_id, current_language)
+                                await ws.send_text(json.dumps({
+                                    "type": "status",
+                                    "status": "language_changed",
+                                    "language": current_language,
+                                }))
+                                continue
+                    except Exception:
+                        pass
+
+                text_msg = raw_text.upper()
 
                 if text_msg == "STOP":
                     if len(audio_buffer) == 0:
@@ -178,8 +199,8 @@ async def websocket_audio(ws: WebSocket):
                         }))
                         continue
 
-                    logger.info("STOP – transcribing %d B", len(audio_buffer))
-                    await _run_pipeline(ws, audio_buffer, session_id)
+                    logger.info("STOP – transcribing %d B (language=%s)", len(audio_buffer), current_language)
+                    await _run_pipeline(ws, audio_buffer, session_id, language=current_language)
                     audio_buffer.clear()
 
                 elif text_msg == "CLEAR":
@@ -188,6 +209,15 @@ async def websocket_audio(ws: WebSocket):
                     await ws.send_text(json.dumps({
                         "type": "status",
                         "status": "history_cleared",
+                    }))
+
+                elif text_msg.startswith("LANG:"):
+                    current_language = text_msg.split(":", 1)[1].strip().lower()
+                    logger.info("Session %s language switched via command to: %s", session_id, current_language)
+                    await ws.send_text(json.dumps({
+                        "type": "status",
+                        "status": "language_changed",
+                        "language": current_language,
                     }))
 
                 else:
@@ -225,7 +255,7 @@ async def websocket_audio(ws: WebSocket):
 # Pipeline helper
 # ---------------------------------------------------------------------------
 
-async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> None:
+async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str, language: str = "en") -> None:
     """
     Execute the full ASR → LLM → TTS pipeline and send results
     back over the WebSocket.
@@ -246,7 +276,9 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> No
     }))
 
     try:
-        asr_result = await asr_engine.transcribe_audio_bytes(bytes(buffer))
+        # If English, enforce English language. If Chinese, auto-detect allows user to speak Chinese or Italian.
+        asr_lang = "en" if language == "en" else None
+        asr_result = await asr_engine.transcribe_audio_bytes(bytes(buffer), language=asr_lang)
         transcription = asr_result["text"]
     except Exception as exc:
         logger.error("ASR failed: %s", exc, exc_info=True)
@@ -263,7 +295,7 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> No
         "status": "ok",
         "transcription": transcription,
         "confidence": asr_result.get("confidence", 0.0),
-        "language": asr_result.get("language", "en"),
+        "language": asr_result.get("language", language),
         "segments": asr_result.get("segments", []),
     }))
 
@@ -289,7 +321,11 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> No
     }))
 
     try:
-        llm_response = await llm_manager.get_response(transcription)
+        if language == "zh":
+            prompt = load_system_prompt(settings.CHINESE_PROMPT_PATH)
+        else:
+            prompt = load_system_prompt(settings.SYSTEM_PROMPT_PATH)
+        llm_response = await llm_manager.get_response(transcription, system_prompt=prompt)
     except Exception as exc:
         logger.error("LLM failed: %s", exc, exc_info=True)
         await ws.send_text(json.dumps({
@@ -308,6 +344,7 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> No
         "type": "llm_response",
         "status": "ok",
         "llm_text": llm_response,
+        "language": language,
     }))
 
     # ---- 3. TTS (Text-to-Speech) -----------------------------------------
@@ -320,7 +357,8 @@ async def _run_pipeline(ws: WebSocket, buffer: bytearray, session_id: str) -> No
     }))
 
     try:
-        audio_bytes = await tts_manager.generate_audio(llm_response)
+        target_voice = tts_manager.get_voice_for_language(language)
+        audio_bytes = await tts_manager.generate_audio(llm_response, voice=target_voice)
     except Exception as exc:
         logger.error("TTS failed: %s", exc, exc_info=True)
         await ws.send_text(json.dumps({

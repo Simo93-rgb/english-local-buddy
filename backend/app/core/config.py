@@ -30,7 +30,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # GPU / Model paths
-    WHISPER_MODEL: str = "medium.en"
+    WHISPER_MODEL: str = "large-v3"
+    DEFAULT_LANGUAGE: str = "en"
 
     # LLM (Unsloth Studio – OpenAI-compatible API)
     LLM_BASE_URL: str = "http://127.0.0.1:8888/v1"
@@ -40,9 +41,11 @@ class Settings(BaseSettings):
     # Prompts
     PROMPT_DIR: str = str(Path(__file__).parent / "prompts")
     SYSTEM_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "english_partner.md")
+    CHINESE_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor.md")
 
     # TTS
     TTS_VOICE: str = "en-US-AvaMultilingualNeural"
+    TTS_VOICE_ZH: str = "zh-CN-XiaoxiaoNeural"
 
     # Audio settings
     SAMPLE_RATE: int = 16_000

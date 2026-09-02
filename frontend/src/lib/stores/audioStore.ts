@@ -57,6 +57,9 @@ export const latestTranscription = writable<string>('');
 /** The latest LLM response text */
 export const latestLLMResponse = writable<string>('');
 
+/** Current learning language */
+export const currentLanguage = writable<'en' | 'zh'>('en');
+
 /** The latest message from the backend */
 export const latestMessage = derived(messageLog, ($log) =>
 	$log.length > 0 ? $log[$log.length - 1] : null
@@ -100,6 +103,14 @@ function playAudioBase64(b64Data: string, format: string = 'mp3'): void {
 // WebSocket helpers
 // ---------------------------------------------------------------------------
 
+export function setLanguage(lang: 'en' | 'zh') {
+	currentLanguage.set(lang);
+	if (ws && ws.readyState === WebSocket.OPEN) {
+		ws.send(JSON.stringify({ type: 'SET_LANGUAGE', language: lang }));
+		console.log('[audioStore] Sent SET_LANGUAGE command:', lang);
+	}
+}
+
 function connectWebSocket(): Promise<void> {
 	return new Promise((resolve, reject) => {
 		if (ws && ws.readyState === WebSocket.OPEN) {
@@ -109,17 +120,23 @@ function connectWebSocket(): Promise<void> {
 
 		connectionStatus.set('connecting');
 
+		let activeLang = 'en';
+		currentLanguage.subscribe((val) => (activeLang = val))();
+
 		if (typeof window !== 'undefined') {
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 			// Since we set up a Vite proxy in vite.config.ts, we can just point to the same host
-			WS_URL = `${protocol}//${window.location.host}/ws/audio`;
+			WS_URL = `${protocol}//${window.location.host}/ws/audio?lang=${activeLang}`;
 		}
 		
 		ws = new WebSocket(WS_URL);
 
 		ws.onopen = () => {
 			connectionStatus.set('connected');
-			console.log('[audioStore] WebSocket connected');
+			console.log('[audioStore] WebSocket connected with language:', activeLang);
+			if (ws && ws.readyState === WebSocket.OPEN) {
+				ws.send(JSON.stringify({ type: 'SET_LANGUAGE', language: activeLang }));
+			}
 			resolve();
 		};
 
@@ -132,6 +149,10 @@ function connectWebSocket(): Promise<void> {
 
 				// Update connection status based on pipeline stage
 				if (data.type === 'status' && data.status) {
+					if (data.status === 'language_changed' && data.language) {
+						currentLanguage.set(data.language as 'en' | 'zh');
+					}
+
 					const statusMap: Record<string, ConnectionStatus> = {
 						transcribing: 'transcribing',
 						thinking: 'thinking',

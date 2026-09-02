@@ -101,7 +101,7 @@ class LLMManager:
     # Public API
     # ------------------------------------------------------------------
 
-    async def get_response(self, user_text: str) -> str:
+    async def get_response(self, user_text: str, system_prompt: str | None = None) -> str:
         """
         Send the user's text to the LLM and return the assistant's reply.
 
@@ -112,6 +112,8 @@ class LLMManager:
         ----------
         user_text : str
             What the user said (ASR transcription).
+        system_prompt : str | None
+            Optional per-request system prompt override.
 
         Returns
         -------
@@ -122,8 +124,9 @@ class LLMManager:
         self._history.append({"role": "user", "content": user_text})
 
         # Build the full message list: system + rolling history
+        active_prompt = system_prompt or self._system_prompt
         messages = [
-            {"role": "system", "content": self._system_prompt},
+            {"role": "system", "content": active_prompt},
             *list(self._history),
         ]
 
