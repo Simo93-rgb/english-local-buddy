@@ -24,6 +24,26 @@ logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=1)
 
 
+def _preload_nvidia_libraries() -> None:
+    """Preload bundled NVIDIA CUDA 12 / cuDNN shared libraries into the global process namespace."""
+    import sys
+    import os
+    import glob
+    import ctypes
+
+    venv_site = os.path.join(sys.prefix, "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+    nvidia_dir = os.path.join(venv_site, "nvidia")
+    if os.path.exists(nvidia_dir):
+        so_files = glob.glob(os.path.join(nvidia_dir, "**/lib/*.so*"), recursive=True)
+        # Prioritize core cublas and cudart libraries
+        so_files.sort(key=lambda p: ("cublas" in p or "cudart" in p, len(p)), reverse=True)
+        for so in so_files:
+            try:
+                ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
+            except Exception:
+                pass
+
+
 class WhisperASR:
     """
     GPU-accelerated ASR engine backed by faster-whisper (CTranslate2).
@@ -61,6 +81,7 @@ class WhisperASR:
         Load the faster-whisper model into VRAM with automatic fallback on CUDA OOM.
         Call once at application startup.
         """
+        _preload_nvidia_libraries()
         from faster_whisper import WhisperModel
 
         strategies = [

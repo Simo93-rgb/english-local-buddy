@@ -371,6 +371,10 @@ async def _run_pipeline(
     }))
 
     if not transcription.strip():
+        await ws.send_text(json.dumps({
+            "type": "status",
+            "status": "done",
+        }))
         return ""
 
     # Log user turn

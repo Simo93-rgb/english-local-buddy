@@ -191,6 +191,12 @@ TONE_DESCRIPTIONS = {
 }
 
 
+ITALIAN_ACCENTED_STOPWORDS = {
+    "è", "é", "perché", "poiché", "affinché", "benché", "così", "già", "più", "può", "ciò",
+    "là", "lì", "sì", "dà", "sé", "caffè", "cioè", "qualità", "città", "verità", "novità",
+}
+
+
 class MandarinToneAnalyzer:
     """
     Acoustic analyzer for Mandarin tones using fundamental frequency (F0) contours.
@@ -203,6 +209,7 @@ class MandarinToneAnalyzer:
         """
         Extract Chinese pinyin syllables and their tone numbers (1-5) from text.
         Supports both accented pinyin (nǐ hǎo, rén shì) and numbered pinyin (ni3 hao3).
+        Filters out common Italian accented words (e.g. 'è', 'perché', 'così').
         """
         if not text:
             return []
@@ -212,6 +219,10 @@ class MandarinToneAnalyzer:
         results: list[tuple[str, int]] = []
 
         for token in tokens:
+            low_tok = token.lower()
+            if low_tok in ITALIAN_ACCENTED_STOPWORDS:
+                continue
+
             # Check for numbered pinyin (e.g. ren2, shi4, ni3)
             num_match = re.search(r"([a-zA-Z]+)([1-5])$", token)
             if num_match:

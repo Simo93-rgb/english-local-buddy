@@ -101,6 +101,28 @@ class LLMManager:
     # Public API
     # ------------------------------------------------------------------
 
+    async def _ensure_unsloth_model_loaded(self) -> None:
+        """Attempt to auto-load the configured model via Unsloth Studio's API."""
+        import httpx
+        try:
+            headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Enable auto-switch
+                await client.put(
+                    "http://127.0.0.1:8888/api/settings/openai-auto-switch",
+                    headers=headers,
+                    json={"enabled": True},
+                )
+                # Load requested model
+                resp = await client.post(
+                    "http://127.0.0.1:8888/v1/load",
+                    headers=headers,
+                    json={"model_path": self.model},
+                )
+                logger.info("Unsloth auto-load for '%s' returned status %d: %s", self.model, resp.status_code, resp.text[:100])
+        except Exception as exc:
+            logger.warning("Failed to auto-load model in Unsloth: %s", exc)
+
     async def get_response(self, user_text: str, system_prompt: str | None = None) -> str:
         """
         Send the user's text to the LLM and return the assistant's reply.
@@ -120,6 +142,8 @@ class LLMManager:
         str
             The LLM's response text.
         """
+        import re
+
         # Append the user message to history
         self._history.append({"role": "user", "content": user_text})
 
@@ -135,32 +159,63 @@ class LLMManager:
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
+                max_tokens=1536,
             )
-
-            assistant_text = response.choices[0].message.content
-            assistant_text = assistant_text.strip() if assistant_text else ""
-
-            # Handle models that output empty strings (e.g. Gemma template mismatches)
-            if not assistant_text:
-                logger.warning("LLM returned an empty response. Falling back to default message.")
-                assistant_text = "I'm sorry, I didn't quite catch that. Could you say it again?"
-                # Do NOT append empty/fallback text to the history to avoid breaking the prompt template
-                # We also remove the user's last message so they can just repeat it naturally
+        except Exception as exc:
+            err_msg = str(exc).lower()
+            if "no model loaded" in err_msg or "call post /inference/load" in err_msg:
+                logger.info("Model not loaded in Unsloth. Auto-triggering model load and retrying...")
+                await self._ensure_unsloth_model_loaded()
+                try:
+                    response = await self._client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.7,
+                        max_tokens=1536,
+                    )
+                except Exception as retry_exc:
+                    logger.error("LLM retry failed: %s", retry_exc)
+                    if self._history and self._history[-1]["role"] == "user":
+                        self._history.pop()
+                    raise
+            else:
+                logger.error("LLM request failed: %s", exc)
+                # Remove the user message we just added since we failed
                 if self._history and self._history[-1]["role"] == "user":
                     self._history.pop()
-            else:
-                # Append valid assistant reply to history
-                self._history.append({"role": "assistant", "content": assistant_text})
+                raise
 
-            logger.info("LLM response: %s", assistant_text[:80])
-            return assistant_text
+        assistant_text = response.choices[0].message.content
+        assistant_text = assistant_text.strip() if assistant_text else ""
 
-        except Exception as exc:
-            logger.error("LLM request failed: %s", exc)
-            # Remove the user message we just added since we failed
+        # Strip reasoning tags if model outputs them inside content (e.g. <think>...</think>)
+        assistant_text = re.sub(r"<think>.*?</think>", "", assistant_text, flags=re.DOTALL).strip()
+
+        # If content is empty (e.g. reasoning model ran long or put output in reasoning_content)
+        if not assistant_text:
+            reasoning = getattr(response.choices[0].message, "reasoning_content", None) or ""
+            if reasoning and ("<it>" in reasoning or "<zh>" in reasoning):
+                tag_matches = list(re.finditer(r"<(?:it|zh)>.*?</(?:it|zh)>", reasoning, re.DOTALL))
+                if tag_matches:
+                    start_pos = tag_matches[0].start()
+                    end_pos = tag_matches[-1].end()
+                    candidate = reasoning[start_pos:end_pos].strip()
+                    if candidate:
+                        logger.info("Recovered assistant response from reasoning_content (%d chars)", len(candidate))
+                        assistant_text = candidate
+
+        # Handle models that still output empty strings
+        if not assistant_text:
+            logger.warning("LLM returned an empty response. Falling back to default message.")
+            assistant_text = "I'm sorry, I didn't quite catch that. Could you say it again?"
             if self._history and self._history[-1]["role"] == "user":
                 self._history.pop()
-            raise
+        else:
+            # Append valid assistant reply to history
+            self._history.append({"role": "assistant", "content": assistant_text})
+
+        logger.info("LLM response: %s", assistant_text[:80])
+        return assistant_text
 
     def clear_history(self) -> None:
         """Reset the conversation context."""

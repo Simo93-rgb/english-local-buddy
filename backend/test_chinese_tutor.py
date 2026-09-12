@@ -46,6 +46,11 @@ def test_pinyin_tone_extraction():
     syllables3 = analyzer.extract_pinyin_syllables(text3)
     assert syllables3 == [("ni", 3), ("hao", 3), ("ma", 5)], f"Got {syllables3}"
 
+    # Test 4: Italian accented stopwords are not falsely recognized as pinyin
+    text4 = "Sì, è vero, perché così va bene"
+    syllables4 = analyzer.extract_pinyin_syllables(text4)
+    assert syllables4 == [], f"Expected no pinyin syllables from Italian stopwords, got {syllables4}"
+
     print("  -> Pinyin tone extraction verified successfully!")
 
 
@@ -85,6 +90,12 @@ def test_tts_language_tags():
     assert segments[0][0] == "it"
     assert segments[1][0] == "zh"
     assert segments[2][0] == "it"
+
+    # Nested / unclosed tag test
+    nested = "<it>Ora prova con me: ripeti dopo di me, <zh>nǐ hǎo</zh><it>, sentendo il tono.</it>"
+    nested_segs = parse_language_tags(nested)
+    assert any(lang == "zh" and "nǐ hǎo" in s for lang, s in nested_segs), f"Failed to isolate zh in {nested_segs}"
+
     print("  -> Polyglot TTS tag parsing verified successfully!")
 
 

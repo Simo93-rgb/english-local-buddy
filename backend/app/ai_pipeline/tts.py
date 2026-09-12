@@ -42,53 +42,81 @@ def strip_language_tags(text: str) -> str:
     return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 
+def clean_speech_segment(text: str) -> str:
+    """
+    Strip markdown formatting and standalone bullet markers for natural speech synthesis.
+    Prevents TTS from reading out dashes, asterisks, or markdown symbols.
+    """
+    if not text:
+        return ""
+    # Remove markdown bold/italics markers, backticks, and header symbols
+    t = re.sub(r"[\*_~`#]", "", text)
+    # Remove leading bullet symbols or standalone dashes
+    t = re.sub(r"^\s*[-•]\s*", "", t)
+    # Clean whitespace
+    t = re.sub(r"\s+", " ", t).strip()
+    # If the remaining string is only punctuation or symbols (e.g. "-", ".", ":"), drop it
+    if re.match(r"^[\s\-_.,;:!?•*~#=]+$", t):
+        return ""
+    return t
+
+
 def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, str]]:
     """
     Parse text containing <it>...</it> and <zh>...</zh> tags into sequential (language, text) segments.
+    Uses token stream parsing to gracefully handle nested or unclosed tags.
+    Cleans markdown formatting from each segment for natural TTS synthesis.
     Provides regex-based fallback if tags are absent.
     """
     if not text:
         return []
 
-    pattern = re.compile(r"<(it|zh|en)>(.*?)</\1>", re.DOTALL | re.IGNORECASE)
-    matches = list(pattern.finditer(text))
+    # Check if any tags are present
+    has_tags = bool(re.search(r"</?(?:it|zh|en)>", text, re.IGNORECASE))
 
-    if not matches:
+    if not has_tags:
         # Fallback: if CJK characters are present without tags, separate CJK from non-CJK
         cjk_pattern = re.compile(r"([\u4e00-\u9fff\u3400-\u4dbf]+)")
         parts = cjk_pattern.split(text)
-        segments: list[tuple[str, str]] = []
+        fallback_segs: list[tuple[str, str]] = []
         for part in parts:
-            p = part.strip()
+            p = clean_speech_segment(part)
             if not p:
                 continue
             if cjk_pattern.search(p):
-                segments.append(("zh", p))
+                fallback_segs.append(("zh", p))
             else:
-                segments.append((default_lang, p))
-        return segments if segments else [(default_lang, text.strip())]
+                fallback_segs.append((default_lang, p))
+        return fallback_segs if fallback_segs else [(default_lang, clean_speech_segment(text))]
 
-    segments: list[tuple[str, str]] = []
-    last_idx = 0
-    for match in matches:
-        start, end = match.span()
-        if start > last_idx:
-            untagged = text[last_idx:start].strip()
-            if untagged:
-                segments.append((default_lang, untagged))
+    # Tokenize by tags
+    tokens = re.split(r"(</?[a-zA-Z]+>)", text)
+    raw_segments: list[tuple[str, str]] = []
+    current_lang = default_lang
 
-        lang = match.group(1).lower()
-        content = match.group(2).strip()
-        if content:
-            segments.append((lang, content))
-        last_idx = end
+    for tok in tokens:
+        if not tok:
+            continue
+        m_open = re.match(r"^<(it|zh|en)>$", tok, re.IGNORECASE)
+        m_close = re.match(r"^</(it|zh|en)>$", tok, re.IGNORECASE)
+        if m_open:
+            current_lang = m_open.group(1).lower()
+        elif m_close:
+            current_lang = default_lang
+        else:
+            clean = clean_speech_segment(tok)
+            if clean:
+                raw_segments.append((current_lang, clean))
 
-    if last_idx < len(text):
-        untagged = text[last_idx:].strip()
-        if untagged:
-            segments.append((default_lang, untagged))
+    # Merge consecutive segments with the same language
+    merged: list[tuple[str, str]] = []
+    for lang, content in raw_segments:
+        if merged and merged[-1][0] == lang:
+            merged[-1] = (lang, f"{merged[-1][1]} {content}")
+        else:
+            merged.append((lang, content))
 
-    return segments
+    return merged
 
 
 class TTSManager:
