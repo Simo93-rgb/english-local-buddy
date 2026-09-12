@@ -223,9 +223,15 @@ function connectWebSocket(): Promise<void> {
 					playAudioBase64(data.audio_b64, data.audio_format || 'mp3');
 				}
 
-				// Log all non-status messages
+				// Log non-status messages to conversation history
 				if (data.type !== 'status') {
-					messageLog.update((log) => [...log, data]);
+					if (data.type === 'tone_analysis') {
+						if (data.tone_analysis?.tones && data.tone_analysis.tones.length > 0) {
+							messageLog.update((log) => [...log, data]);
+						}
+					} else {
+						messageLog.update((log) => [...log, data]);
+					}
 				}
 			} catch (err) {
 				console.error('[audioStore] Failed to parse WS message:', err);

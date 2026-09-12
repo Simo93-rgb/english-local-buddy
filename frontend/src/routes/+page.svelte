@@ -24,8 +24,21 @@
 		reportMessage = null;
 		try {
 			await toggleRecording();
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to start recording';
+		} catch (err: any) {
+			const msg = err instanceof Error ? err.message : String(err);
+			if (
+				msg.includes('not allowed') ||
+				msg.includes('denied') ||
+				msg.includes('Permission') ||
+				err?.name === 'NotAllowedError'
+			) {
+				error =
+					'Accesso al microfono non consentito dal browser o dal sistema. ' +
+					'Assicurati di accedere tramite http://localhost:1420 (e non tramite IP di rete) ' +
+					'e di aver consentito il permesso per il microfono nelle impostazioni del browser o del sistema.';
+			} else {
+				error = msg || 'Impossibile avviare la registrazione.';
+			}
 		}
 	}
 
