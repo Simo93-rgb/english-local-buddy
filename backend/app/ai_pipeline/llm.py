@@ -154,12 +154,17 @@ class LLMManager:
             *list(self._history),
         ]
 
+        extra_body: dict[str, Any] = {}
+        if not getattr(settings, "LLM_ENABLE_THINKING", False):
+            extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+
         try:
             response = await self._client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=1536,
+                extra_body=extra_body if extra_body else None,
             )
         except Exception as exc:
             err_msg = str(exc).lower()
@@ -172,6 +177,7 @@ class LLMManager:
                         messages=messages,
                         temperature=0.7,
                         max_tokens=1536,
+                        extra_body=extra_body if extra_body else None,
                     )
                 except Exception as retry_exc:
                     logger.error("LLM retry failed: %s", retry_exc)

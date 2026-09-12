@@ -97,7 +97,7 @@ fi
 export PYTHONPATH="$BACKEND_DIR"
 NVIDIA_CU12_LIBS=$(find "$BACKEND_DIR/.venv" -type d -name "lib" -path "*/site-packages/nvidia/*/lib" 2>/dev/null | tr '\n' ':')
 export LD_LIBRARY_PATH="${NVIDIA_CU12_LIBS}/usr/local/lib/ollama/cuda_v12:${LD_LIBRARY_PATH:-}"
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port $BACKEND_PORT &
+uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port $BACKEND_PORT &
 BACKEND_PID=$!
 echo -e "${GREEN}Backend started with PID: $BACKEND_PID${NC}"
 

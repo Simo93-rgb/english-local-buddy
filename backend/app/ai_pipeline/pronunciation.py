@@ -192,8 +192,11 @@ TONE_DESCRIPTIONS = {
 
 
 ITALIAN_ACCENTED_STOPWORDS = {
-    "è", "é", "perché", "poiché", "affinché", "benché", "così", "già", "più", "può", "ciò",
-    "là", "lì", "sì", "dà", "sé", "caffè", "cioè", "qualità", "città", "verità", "novità",
+    "è", "é", "perché", "poiché", "affinché", "benché", "cosicché", "giacché", "purché",
+    "così", "già", "più", "può", "ciò", "là", "lì", "sì", "dà", "sé", "cioè",
+    "qualità", "città", "università", "caffè", "verità", "novità", "realtà", "metà",
+    "virtù", "gioventù", "perciò", "dopodiché",
+    "sarà", "avrà", "farà", "andrà", "vorrà", "potrà", "dovrà", "verrà",
 }
 
 
@@ -221,6 +224,10 @@ class MandarinToneAnalyzer:
         for token in tokens:
             low_tok = token.lower()
             if low_tok in ITALIAN_ACCENTED_STOPWORDS:
+                continue
+            if len(low_tok) > 2 and (low_tok.endswith("tà") or low_tok.endswith("tù")):
+                continue
+            if low_tok.endswith("ché") or low_tok.endswith("cché"):
                 continue
 
             # Check for numbered pinyin (e.g. ren2, shi4, ni3)

@@ -99,6 +99,24 @@ def test_tts_language_tags():
     print("  -> Polyglot TTS tag parsing verified successfully!")
 
 
+def test_pinyin_rescue_in_tts():
+    print("Testing automatic pinyin and Hanzi rescue from Italian text...")
+    sample = (
+        'Certo! In cinese ci sono due modi molto comuni per scusarsi. '
+        '对不起，duìbuqǐ è il modo più completo e formale... '
+        'La pronuncia è delicata: "duì" come in "dietro"... "buqǐ" è veloce... '
+        'L\'altro modo è: 抱歉，bàoràn... Ora prova a ripetere dopo di me: duìbuqǐ.'
+    )
+    segs = parse_language_tags(sample, default_lang="it")
+    zh_texts = " ".join(s for lang, s in segs if lang == "zh")
+    assert "duì" in zh_texts, f"duì not found in zh segments: {segs}"
+    assert "buqǐ" in zh_texts, f"buqǐ not found in zh segments: {segs}"
+    assert "bàoràn" in zh_texts, f"bàoràn not found in zh segments: {segs}"
+    assert "对不起" in zh_texts, f"对不起 not found in zh segments: {segs}"
+    assert "抱歉" in zh_texts, f"抱歉 not found in zh segments: {segs}"
+    print("  -> Pinyin and Hanzi rescue verified successfully!")
+
+
 def test_history_manager_routing():
     print("Testing HistoryManager report routing...")
     hm = HistoryManager()
@@ -115,5 +133,6 @@ if __name__ == "__main__":
     test_pinyin_tone_extraction()
     test_tone_contour_classification()
     test_tts_language_tags()
+    test_pinyin_rescue_in_tts()
     test_history_manager_routing()
     print("\nALL BACKEND TESTS PASSED SUCCESSFULLY! ✅")

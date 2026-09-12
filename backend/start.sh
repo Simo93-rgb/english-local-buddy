@@ -15,4 +15,4 @@ NVIDIA_CU12_LIBS=$(find "$SCRIPT_DIR/.venv" -type d -name "lib" -path "*/site-pa
 export LD_LIBRARY_PATH="${NVIDIA_CU12_LIBS}/usr/local/lib/ollama/cuda_v12:${LD_LIBRARY_PATH:-}"
 
 echo "Starting English Buddy backend on http://0.0.0.0:8000 ..."
-exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+exec uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000

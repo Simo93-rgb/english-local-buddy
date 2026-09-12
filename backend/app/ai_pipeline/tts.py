@@ -42,6 +42,85 @@ def strip_language_tags(text: str) -> str:
     return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 
+ITALIAN_ACCENTED_WORDS = {
+    "è", "é", "perché", "poiché", "affinché", "benché", "cosicché", "giacché", "purché",
+    "così", "già", "più", "può", "ciò", "là", "lì", "sì", "dà", "sé", "cioè",
+    "qualità", "città", "università", "caffè", "verità", "novità", "realtà", "metà",
+    "virtù", "gioventù", "perciò", "dopodiché",
+    "sarà", "avrà", "farà", "andrà", "vorrà", "potrà", "dovrà", "verrà",
+}
+
+PINYIN_TONE_CHARS = set("āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ")
+
+
+def is_chinese_or_pinyin(word: str) -> bool:
+    """
+    Detect whether a token is Chinese text (Hanzi) or a Mandarin Pinyin word with tones.
+    Strictly excludes common Italian accented words.
+    """
+    clean = re.sub(r"[^\w\u4e00-\u9fff\u3400-\u4dbfāáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]", "", word)
+    if not clean:
+        return False
+    # Check for Hanzi
+    if re.search(r"[\u4e00-\u9fff\u3400-\u4dbf]", clean):
+        return True
+    low = clean.lower()
+    if low in ITALIAN_ACCENTED_WORDS:
+        return False
+    # Italian words ending in -tà or -tù (umiltà, sincerità, onestà, difficoltà, etc.)
+    if len(low) > 2 and (low.endswith("tà") or low.endswith("tù")):
+        return False
+    if low.endswith("ché") or low.endswith("cché"):
+        return False
+    # Check for Pinyin tone diacritics (e.g. nǐ, hǎo, duì, buqǐ, bàoràn)
+    if any(c in PINYIN_TONE_CHARS for c in low):
+        return True
+    # Check for numbered pinyin (e.g. ren2, shi4, hao3)
+    if re.match(r"^[a-z]+[1-5]$", low):
+        return True
+    return False
+
+
+def split_italian_segment_by_chinese(it_text: str) -> list[tuple[str, str]]:
+    """
+    Sub-segment an Italian text fragment by rescuing any Hanzi or Pinyin tokens that were
+    accidentally embedded without <zh> tags or placed inside an <it> tag block.
+    """
+    tokens = re.split(r"(\s+|[.,;:!?\"'“”«»()]+)", it_text)
+    sub_segments: list[tuple[str, str]] = []
+    current_lang = "it"
+    current_buffer: list[str] = []
+
+    for tok in tokens:
+        if not tok:
+            continue
+        if is_chinese_or_pinyin(tok):
+            if current_lang == "it" and current_buffer:
+                flushed = clean_speech_segment("".join(current_buffer))
+                if flushed:
+                    sub_segments.append(("it", flushed))
+                current_buffer = []
+            current_lang = "zh"
+            current_buffer.append(tok)
+        elif re.match(r"^[\s.,;:!?\"'“”«»()]+$", tok):
+            current_buffer.append(tok)
+        else:
+            if current_lang == "zh" and current_buffer:
+                flushed = clean_speech_segment("".join(current_buffer))
+                if flushed:
+                    sub_segments.append(("zh", flushed))
+                current_buffer = []
+            current_lang = "it"
+            current_buffer.append(tok)
+
+    if current_buffer:
+        flushed = clean_speech_segment("".join(current_buffer))
+        if flushed:
+            sub_segments.append((current_lang, flushed))
+
+    return sub_segments
+
+
 def clean_speech_segment(text: str) -> str:
     """
     Strip markdown formatting and standalone bullet markers for natural speech synthesis.
@@ -49,8 +128,8 @@ def clean_speech_segment(text: str) -> str:
     """
     if not text:
         return ""
-    # Remove markdown bold/italics markers, backticks, and header symbols
-    t = re.sub(r"[\*_~`#]", "", text)
+    # Remove markdown bold/italics markers, backticks, quotes, and header symbols
+    t = re.sub(r"[\*_~`#\"'“”«»]", "", text)
     # Remove leading bullet symbols or standalone dashes
     t = re.sub(r"^\s*[-•]\s*", "", t)
     # Clean whitespace
@@ -64,9 +143,8 @@ def clean_speech_segment(text: str) -> str:
 def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, str]]:
     """
     Parse text containing <it>...</it> and <zh>...</zh> tags into sequential (language, text) segments.
-    Uses token stream parsing to gracefully handle nested or unclosed tags.
+    Uses token stream parsing and automatically rescues untagged Chinese characters / Pinyin from Italian text.
     Cleans markdown formatting from each segment for natural TTS synthesis.
-    Provides regex-based fallback if tags are absent.
     """
     if not text:
         return []
@@ -75,19 +153,8 @@ def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, 
     has_tags = bool(re.search(r"</?(?:it|zh|en)>", text, re.IGNORECASE))
 
     if not has_tags:
-        # Fallback: if CJK characters are present without tags, separate CJK from non-CJK
-        cjk_pattern = re.compile(r"([\u4e00-\u9fff\u3400-\u4dbf]+)")
-        parts = cjk_pattern.split(text)
-        fallback_segs: list[tuple[str, str]] = []
-        for part in parts:
-            p = clean_speech_segment(part)
-            if not p:
-                continue
-            if cjk_pattern.search(p):
-                fallback_segs.append(("zh", p))
-            else:
-                fallback_segs.append((default_lang, p))
-        return fallback_segs if fallback_segs else [(default_lang, clean_speech_segment(text))]
+        # Fallback: if no tags present, split Italian text by Chinese/Pinyin
+        return split_italian_segment_by_chinese(text) if default_lang in ("it", "zh") else [(default_lang, clean_speech_segment(text))]
 
     # Tokenize by tags
     tokens = re.split(r"(</?[a-zA-Z]+>)", text)
@@ -108,9 +175,20 @@ def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, 
             if clean:
                 raw_segments.append((current_lang, clean))
 
+    # Secondary rescue pass: rescue any Chinese characters or Pinyin trapped inside "it" segments
+    expanded_segments: list[tuple[str, str]] = []
+    for lang, content in raw_segments:
+        if lang == "it" and default_lang in ("it", "zh"):
+            sub_segs = split_italian_segment_by_chinese(content)
+            expanded_segments.extend(sub_segs)
+        else:
+            expanded_segments.append((lang, content))
+
     # Merge consecutive segments with the same language
     merged: list[tuple[str, str]] = []
-    for lang, content in raw_segments:
+    for lang, content in expanded_segments:
+        if not content:
+            continue
         if merged and merged[-1][0] == lang:
             merged[-1] = (lang, f"{merged[-1][1]} {content}")
         else:
