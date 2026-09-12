@@ -108,7 +108,10 @@ if [ ! -d "node_modules" ]; then
     pnpm install
 fi
 
-# Run tauri dev in the foreground (force GDK to use x11 backend to avoid Wayland protocol errors under Wayland)
+# Run tauri dev in the foreground:
+# 1. Force GDK to use x11 backend to avoid Wayland protocol errors under Wayland
+# 2. Disable WebKitGTK DMABUF renderer to avoid 'Failed to create GBM buffer' blank window on NVIDIA/KDE/Arch
 export GDK_BACKEND=x11
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
 pnpm tauri dev
 

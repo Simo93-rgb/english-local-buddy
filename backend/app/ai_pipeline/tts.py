@@ -29,7 +29,7 @@ DEFAULT_VOICE = "en-US-AvaMultilingualNeural"
 def strip_language_tags(text: str) -> str:
     """
     Remove inline language tags (e.g. <it>...</it>, <zh>...</zh>) and return clean text.
-    Ensures proper word separation between adjacent tags.
+    Ensures proper word separation between adjacent tags and removes spaces before punctuation.
     Suitable for frontend UI display and chat logs.
     """
     if not text:
@@ -37,6 +37,8 @@ def strip_language_tags(text: str) -> str:
     # Replace adjacent tag boundaries like </it><zh> with a space so words don't stick together
     cleaned = re.sub(r"</(?:it|zh|en)>\s*<(?:it|zh|en)>", " ", text, flags=re.IGNORECASE)
     cleaned = re.sub(r"</?(?:it|zh|en)>", " ", cleaned, flags=re.IGNORECASE)
+    # Ensure punctuation doesn't get separated from words
+    cleaned = re.sub(r"\s+([.,!?;:])", r"\1", cleaned)
     return re.sub(r"[ \t]+", " ", cleaned).strip()
 
 

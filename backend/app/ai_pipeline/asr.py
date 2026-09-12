@@ -58,23 +58,64 @@ class WhisperASR:
 
     def load_model(self) -> None:
         """
-        Load the faster-whisper model into VRAM.
+        Load the faster-whisper model into VRAM with automatic fallback on CUDA OOM.
         Call once at application startup.
         """
         from faster_whisper import WhisperModel
 
-        logger.info(
-            "Loading Whisper model '%s' on %s (%s) …",
-            self.model_size,
-            self.device,
-            self.compute_type,
-        )
-        self._model = WhisperModel(
-            self.model_size,
-            device=self.device,
-            compute_type=self.compute_type,
-        )
-        logger.info("Whisper model loaded successfully.")
+        strategies = [
+            # Primary strategy: requested model and compute type
+            (self.model_size, self.device, self.compute_type),
+            # Strategy 2: quantize to int8 on GPU to reduce VRAM by ~50%
+            (self.model_size, self.device, "int8"),
+            # Strategy 3: lightweight turbo model if primary was large
+            ("large-v3-turbo", self.device, "int8_float16"),
+            # Strategy 4: fallback to CPU
+            (self.model_size, "cpu", "int8"),
+        ]
+
+        # De-duplicate strategies
+        unique_strategies = []
+        for strat in strategies:
+            if strat not in unique_strategies:
+                unique_strategies.append(strat)
+
+        last_error = None
+        for model_name, dev, comp in unique_strategies:
+            try:
+                logger.info(
+                    "Loading Whisper model '%s' on %s (%s) …",
+                    model_name,
+                    dev,
+                    comp,
+                )
+                self._model = WhisperModel(
+                    model_name,
+                    device=dev,
+                    compute_type=comp,
+                )
+                self.model_size = model_name
+                self.device = dev
+                self.compute_type = comp
+                logger.info("Whisper model '%s' loaded successfully on %s (%s).", model_name, dev, comp)
+                return
+            except Exception as exc:
+                err_str = str(exc)
+                if "out of memory" in err_str.lower() or "cuda failed" in err_str.lower():
+                    logger.warning(
+                        "CUDA OOM loading Whisper '%s' on %s (%s): %s. Attempting next fallback strategy...",
+                        model_name,
+                        dev,
+                        comp,
+                        exc,
+                    )
+                    last_error = exc
+                else:
+                    logger.error("Failed loading Whisper model '%s': %s", model_name, exc)
+                    raise
+
+        if last_error:
+            raise last_error
 
     def unload_model(self) -> None:
         """Release model resources and free VRAM."""
@@ -137,7 +178,12 @@ class WhisperASR:
     # Transcription
     # ------------------------------------------------------------------
 
-    def _transcribe_sync(self, audio_array: np.ndarray, language: str | None = None) -> dict:
+    def _transcribe_sync(
+        self,
+        audio_array: np.ndarray,
+        language: str | None = None,
+        initial_prompt: str | None = None,
+    ) -> dict:
         """
         Synchronous transcription (runs on the thread pool).
 
@@ -147,6 +193,8 @@ class WhisperASR:
             16 kHz mono float32 waveform.
         language : str | None
             Language code (e.g. "en", "zh", or None for auto-detect).
+        initial_prompt : str | None
+            Optional prompt/context to guide vocabulary and language style.
 
         Returns
         -------
@@ -163,6 +211,7 @@ class WhisperASR:
         segments_iter, info = self._model.transcribe(
             audio_array,
             language=target_lang,
+            initial_prompt=initial_prompt,
             beam_size=5,
             vad_filter=True,          # skip silence
             vad_parameters=dict(
@@ -197,7 +246,12 @@ class WhisperASR:
             "segments": segments,
         }
 
-    async def transcribe_audio_bytes(self, audio_bytes: bytes, language: str | None = None) -> dict:
+    async def transcribe_audio_bytes(
+        self,
+        audio_bytes: bytes,
+        language: str | None = None,
+        initial_prompt: str | None = None,
+    ) -> dict:
         """
         Decode raw audio bytes and transcribe asynchronously.
 
@@ -212,6 +266,8 @@ class WhisperASR:
             Raw audio data (any format ffmpeg can decode).
         language : str | None
             Optional language code ("en", "zh", etc.).
+        initial_prompt : str | None
+            Optional prompt to guide Whisper lexicon and bilingual pinyin/hanzi context.
 
         Returns
         -------
@@ -231,6 +287,6 @@ class WhisperASR:
         # Run CTranslate2 inference on the thread pool
         result = await loop.run_in_executor(
             _executor,
-            partial(self._transcribe_sync, audio_array, language=language),
+            partial(self._transcribe_sync, audio_array, language=language, initial_prompt=initial_prompt),
         )
         return result

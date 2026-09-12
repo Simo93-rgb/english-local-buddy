@@ -10,6 +10,10 @@
 		disconnectWebSocket,
 		currentLanguage,
 		setLanguage,
+		chineseLevel,
+		setChineseLevel,
+		latestToneAnalysis,
+		type ChineseLevel,
 	} from '$lib/stores/audioStore';
 
 	let error = $state<string | null>(null);
@@ -27,7 +31,8 @@
 
 	function handleDisconnect() {
 		disconnectWebSocket();
-		reportMessage = "Session ended. Your progress report has been updated in 'user_history/user_report.md'.";
+		const reportName = $currentLanguage === 'zh' ? 'user_history/user_chinese_report.md' : 'user_history/user_report.md';
+		reportMessage = `Session ended. Your progress report has been updated in '${reportName}'.`;
 		setTimeout(() => {
 			reportMessage = null;
 		}, 10000);
@@ -84,27 +89,64 @@
 			{$currentLanguage === 'zh' ? 'Chinese Buddy' : 'English Buddy'}
 		</h1>
 		<p class="mt-2 text-gray-400 text-sm">
-			{$currentLanguage === 'zh' ? 'Tutor di Cinese Mandarino per Principianti (spiegazioni in italiano)' : 'Local Pronunciation & Conversation Trainer'}
+			{#if $currentLanguage === 'zh'}
+				{#if $chineseLevel === 'beginner_tutor'}
+					🎓 Tutor Bilingue Principianti: Fonetica, Vocali, Consonanti, Toni & Cultura
+				{:else if $chineseLevel === 'intermediate'}
+					🗣️ Pratica Guidata Bilingue: Dialoghi Quotidiani & Grammatica
+				{:else}
+					🚀 Conversational Buddy: Dialogo Fluente in Cinese Mandarino
+				{/if}
+			{:else}
+				Local English Pronunciation & Conversation Trainer
+			{/if}
 		</p>
 	</header>
 
 	<!-- Language Selector -->
-	<div class="mb-6 flex items-center bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800 shadow-inner">
+	<div class="mb-4 flex items-center bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800 shadow-inner">
 		<button
 			onclick={() => setLanguage('en')}
 			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'en' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-gray-400 hover:text-gray-200'}"
 		>
 			<span class="text-sm">🇬🇧</span>
-			<span>English</span>
+			<span>English Buddy</span>
 		</button>
 		<button
 			onclick={() => setLanguage('zh')}
 			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'zh' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30' : 'text-gray-400 hover:text-gray-200'}"
 		>
 			<span class="text-sm">🇨🇳</span>
-			<span>Cinese Mandarino</span>
+			<span>Chinese Buddy</span>
 		</button>
 	</div>
+
+	<!-- Chinese Level Selector (only shown in Chinese mode) -->
+	{#if $currentLanguage === 'zh'}
+		<div class="mb-6 flex flex-wrap items-center justify-center gap-1.5 bg-gray-900/70 p-1.5 rounded-2xl border border-rose-900/30 shadow-inner max-w-xl">
+			<button
+				onclick={() => setChineseLevel('beginner_tutor')}
+				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'beginner_tutor' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+			>
+				<span>🎓</span>
+				<span>Principiante (Tutor Fonetica & Cultura)</span>
+			</button>
+			<button
+				onclick={() => setChineseLevel('intermediate')}
+				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'intermediate' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+			>
+				<span>🗣️</span>
+				<span>Intermedio (Pratica)</span>
+			</button>
+			<button
+				onclick={() => setChineseLevel('advanced_buddy')}
+				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'advanced_buddy' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+			>
+				<span>🚀</span>
+				<span>Avanzato (Buddy)</span>
+			</button>
+		</div>
+	{/if}
 
 	<!-- Connection status badge and controls -->
 	<div class="mb-6 flex items-center gap-3">
@@ -210,6 +252,40 @@
 				<p class="text-lg text-gray-100">{$latestLLMResponse}</p>
 			</div>
 		{/if}
+
+		<!-- Acoustic Tone Assessment Card (shown in Chinese mode when tones are detected) -->
+		{#if $currentLanguage === 'zh' && $latestToneAnalysis && $latestToneAnalysis.tones && $latestToneAnalysis.tones.length > 0}
+			<div class="rounded-2xl border border-amber-900/40 bg-amber-950/20 backdrop-blur p-5 space-y-3">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<span class="text-sm">🎯</span>
+						<span class="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+							Analisi Acustica della Pronuncia & Toni (F0)
+						</span>
+					</div>
+					<span class="text-xs font-bold px-2.5 py-0.5 rounded-full {$latestToneAnalysis.overall_accuracy >= 80 ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/50' : 'bg-amber-900/60 text-amber-300 border border-amber-700/50'}">
+						{$latestToneAnalysis.overall_accuracy}% Corretto
+					</span>
+				</div>
+
+				<div class="grid grid-cols-1 gap-2.5 pt-1">
+					{#each $latestToneAnalysis.tones as toneItem}
+						<div class="p-3 rounded-xl border {toneItem.is_correct ? 'border-emerald-900/40 bg-emerald-950/20' : 'border-rose-900/40 bg-rose-950/20'} flex flex-col gap-1">
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<span class="text-base font-bold text-white tracking-wide">{toneItem.syllable}</span>
+									<span class="text-xs px-2 py-0.5 rounded-md {toneItem.is_correct ? 'bg-emerald-900/50 text-emerald-200' : 'bg-rose-900/50 text-rose-200'} font-mono">
+										Atteso: {toneItem.expected_tone}° tono | Rilevato: {toneItem.detected_tone > 0 ? toneItem.detected_tone + '° tono' : 'non rilevato'}
+									</span>
+								</div>
+								<span>{toneItem.is_correct ? '✅' : '⚠️'}</span>
+							</div>
+							<p class="text-xs text-gray-300 mt-0.5">{toneItem.feedback}</p>
+						</div>
+					{/each}
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Message log -->
@@ -249,6 +325,9 @@
 								{:else if msg.type === 'llm_response'}
 									<span class="text-cyan-300 font-medium">Buddy:</span>
 									<span class="text-gray-300 ml-1">{msg.llm_text}</span>
+								{:else if msg.type === 'tone_analysis' && msg.tone_analysis}
+									<span class="text-amber-300 font-medium">🎯 Toni (F0):</span>
+									<span class="text-gray-300 ml-1">{msg.tone_analysis.summary}</span>
 								{:else if msg.type === 'tts_audio'}
 									<span class="text-gray-500 italic">🔊 Audio played</span>
 								{:else if msg.type === 'error'}

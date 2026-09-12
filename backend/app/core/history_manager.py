@@ -42,6 +42,30 @@ Instructions:
 4. Do NOT output any preamble, markdown code fences, or chat preamble. Return ONLY the raw updated Markdown report.
 """
 
+CHINESE_ASSESSOR_SYSTEM_PROMPT = """\
+Sei un esperto insegnante e valutatore di lingua Cinese Mandarino per studenti italiani.
+Il tuo compito è analizzare una conversazione tra uno studente principiante e il tutor, e aggiornare il report persistente 'User Chinese Mandarin Proficiency Report'.
+
+Istruzioni:
+1. Esamina il report esistente e il log dell'ultima sessione.
+2. Aggiorna il report evidenziando:
+   - Livello attuale e sicurezza nel parlato/ripetizione.
+   - Padronanza fonetica: vocali, consonanti critiche (zh/ch/sh/r, aspirate p/t/k vs b/d/g) e soprattutto i 4 toni mandarini.
+   - Vocabolario, morfemi e caratteri (Pinyin e Hanzi) introdotti o consolidati.
+   - Nozioni e curiosità culturali comprese dallo studente.
+   - Errori di tono o fonetica ricorrenti e quelli risolti.
+3. Mantieni il report in formato Markdown, chiaro, ordinato e strutturato esattamente in queste sezioni:
+   - # User Chinese Mandarin Proficiency Report
+   - ## Livello e Competenze Generali
+   - ## Padronanza Fonetica & Toni
+     - **Toni Padronati**:
+     - **Toni e Consonanti da Esercitare**:
+   - ## Vocabolario e Morfemi Appresi (Pinyin e Hanzi)
+   - ## Riferimenti Culturali ed Etimologici Assimilati
+   - ## Prossimi Obiettivi Didattici
+4. Restituisci ESCLUSIVAMENTE il report Markdown aggiornato, senza testo introduttivo o blocchi di codice.
+"""
+
 BLANK_REPORT_TEMPLATE = """\
 # User English Proficiency Report
 
@@ -59,10 +83,31 @@ BLANK_REPORT_TEMPLATE = """\
 1. Start speaking and practicing daily.
 """
 
+BLANK_CHINESE_REPORT_TEMPLATE = """\
+# User Chinese Mandarin Proficiency Report
+
+## Livello e Competenze Generali
+- Nessuna sessione registrata. Inizia la pratica con il tutor per monitorare i tuoi progressi.
+
+## Padronanza Fonetica & Toni
+- **Toni Padronati**: Nessuno ancora registrato
+- **Toni e Consonanti da Esercitare**: Esercizi sui 4 toni e consonanti retroflesse/aspirate
+
+## Vocabolario e Morfemi Appresi (Pinyin e Hanzi)
+- N/A
+
+## Riferimenti Culturali ed Etimologici Assimilati
+- N/A
+
+## Prossimi Obiettivi Didattici
+1. Familiarizzare con l'intonazione dei 4 toni e le basi fonetiche del Pinyin.
+"""
+
 
 class HistoryManager:
     """
     Manages incremental conversation logging and progress report updates.
+    Supports distinct reports for English (user_report.md) and Chinese (user_chinese_report.md).
     """
 
     def __init__(self, history_dir: str | None = None) -> None:
@@ -86,9 +131,14 @@ class HistoryManager:
         """Get the file path for the session's log file."""
         return self.sessions_dir / f"chat_log_{session_id}.md"
 
-    def get_report_file_path(self) -> Path:
-        """Get the file path for the single persistent report."""
-        return self.history_dir / "user_report.md"
+    def get_report_file_path(self, session_id: str = "") -> Path:
+        """
+        Get the file path for the persistent report.
+        Routes to user_chinese_report.md if session is for Chinese, otherwise user_report.md.
+        """
+        if "_zh" in session_id.lower():
+            return self.history_dir / getattr(settings, "CHINESE_REPORT_FILENAME", "user_chinese_report.md")
+        return self.history_dir / getattr(settings, "REPORT_FILENAME", "user_report.md")
 
     async def start_session(self, session_id: str) -> None:
         """Initialise the session log file with header metadata."""
@@ -98,7 +148,9 @@ class HistoryManager:
         session_file = self.get_session_file_path(session_id)
         if not session_file.exists():
             timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            header = f"# English Buddy Chat Session – {timestamp_str}\nSession ID: {session_id}\n\n"
+            is_chinese = "_zh" in session_id.lower()
+            title = "Chinese Buddy Chat Session" if is_chinese else "English Buddy Chat Session"
+            header = f"# {title} – {timestamp_str}\nSession ID: {session_id}\n\n"
             await asyncio.to_thread(session_file.write_text, header, encoding="utf-8")
             logger.info("Started session log file: %s", session_file)
 
@@ -133,13 +185,14 @@ class HistoryManager:
 
     async def update_progress_report(self, session_id: str) -> str | None:
         """
-        Analyse the session history and update the persistent user_report.md.
+        Analyse the session history and update the persistent user_report.md or user_chinese_report.md.
         """
         # Ensure only one update runs at a time for this session
         lock = self._update_locks.setdefault(session_id, asyncio.Lock())
         async with lock:
             session_file = self.get_session_file_path(session_id)
-            report_file = self.get_report_file_path()
+            report_file = self.get_report_file_path(session_id)
+            is_chinese = "_zh" in session_id.lower()
             
             if not session_file.exists():
                 logger.warning("Session file does not exist, skipping report update: %s", session_file)
@@ -151,12 +204,13 @@ class HistoryManager:
             if report_file.exists():
                 existing_report = await asyncio.to_thread(report_file.read_text, encoding="utf-8")
             else:
-                existing_report = BLANK_REPORT_TEMPLATE
+                existing_report = BLANK_CHINESE_REPORT_TEMPLATE if is_chinese else BLANK_REPORT_TEMPLATE
                 
-            logger.info("Running LLM analysis to update progress report for session %s...", session_id)
+            logger.info("Running LLM analysis to update progress report for session %s (%s)...", session_id, report_file.name)
             
+            assessor_prompt = CHINESE_ASSESSOR_SYSTEM_PROMPT if is_chinese else ASSESSOR_SYSTEM_PROMPT
             messages = [
-                {"role": "system", "content": ASSESSOR_SYSTEM_PROMPT},
+                {"role": "system", "content": assessor_prompt},
                 {
                     "role": "user",
                     "content": (
@@ -179,7 +233,7 @@ class HistoryManager:
                     updated_report = updated_report.strip()
                     # Write updated report
                     await asyncio.to_thread(report_file.write_text, updated_report, encoding="utf-8")
-                    logger.info("Progress report user_report.md updated successfully.")
+                    logger.info("Progress report %s updated successfully.", report_file.name)
                     return updated_report
                 else:
                     logger.warning("LLM returned empty progress report.")

@@ -14,6 +14,21 @@ import { writable, derived, get } from 'svelte/store';
 // Types
 // ---------------------------------------------------------------------------
 
+export interface ToneAssessmentItem {
+	syllable: string;
+	expected_tone: number;
+	detected_tone: number;
+	is_correct: boolean;
+	pitch_contour?: number[];
+	feedback: string;
+}
+
+export interface ToneAnalysisData {
+	overall_accuracy: number;
+	tones: ToneAssessmentItem[];
+	summary: string;
+}
+
 export interface WSMessage {
 	type?: string;
 	status: string;
@@ -22,6 +37,7 @@ export interface WSMessage {
 	language?: string;
 	segments?: Array<{ start: number; end: number; text: string; avg_logprob: number }>;
 	gop_score?: number | null;
+	tone_analysis?: ToneAnalysisData;
 	llm_text?: string;
 	audio_b64?: string;
 	audio_format?: string;
@@ -37,6 +53,8 @@ type ConnectionStatus =
 	| 'thinking'
 	| 'speaking'
 	| 'error';
+
+export type ChineseLevel = 'beginner_tutor' | 'intermediate' | 'advanced_buddy';
 
 // ---------------------------------------------------------------------------
 // Stores
@@ -59,6 +77,12 @@ export const latestLLMResponse = writable<string>('');
 
 /** Current learning language */
 export const currentLanguage = writable<'en' | 'zh'>('en');
+
+/** Current Chinese learning level */
+export const chineseLevel = writable<ChineseLevel>('beginner_tutor');
+
+/** The latest acoustic tone assessment result */
+export const latestToneAnalysis = writable<ToneAnalysisData | null>(null);
 
 /** The latest message from the backend */
 export const latestMessage = derived(messageLog, ($log) =>
@@ -111,6 +135,14 @@ export function setLanguage(lang: 'en' | 'zh') {
 	}
 }
 
+export function setChineseLevel(level: ChineseLevel) {
+	chineseLevel.set(level);
+	if (ws && ws.readyState === WebSocket.OPEN) {
+		ws.send(JSON.stringify({ type: 'SET_LEVEL', level }));
+		console.log('[audioStore] Sent SET_LEVEL command:', level);
+	}
+}
+
 function connectWebSocket(): Promise<void> {
 	return new Promise((resolve, reject) => {
 		if (ws && ws.readyState === WebSocket.OPEN) {
@@ -121,21 +153,26 @@ function connectWebSocket(): Promise<void> {
 		connectionStatus.set('connecting');
 
 		let activeLang = 'en';
+		let activeLevel = 'beginner_tutor';
 		currentLanguage.subscribe((val) => (activeLang = val))();
+		chineseLevel.subscribe((val) => (activeLevel = val))();
 
 		if (typeof window !== 'undefined') {
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 			// Since we set up a Vite proxy in vite.config.ts, we can just point to the same host
-			WS_URL = `${protocol}//${window.location.host}/ws/audio?lang=${activeLang}`;
+			WS_URL = `${protocol}//${window.location.host}/ws/audio?lang=${activeLang}&level=${activeLevel}`;
 		}
 		
 		ws = new WebSocket(WS_URL);
 
 		ws.onopen = () => {
 			connectionStatus.set('connected');
-			console.log('[audioStore] WebSocket connected with language:', activeLang);
+			console.log('[audioStore] WebSocket connected with language:', activeLang, 'level:', activeLevel);
 			if (ws && ws.readyState === WebSocket.OPEN) {
 				ws.send(JSON.stringify({ type: 'SET_LANGUAGE', language: activeLang }));
+				if (activeLang === 'zh') {
+					ws.send(JSON.stringify({ type: 'SET_LEVEL', level: activeLevel }));
+				}
 			}
 			resolve();
 		};
@@ -152,6 +189,9 @@ function connectWebSocket(): Promise<void> {
 					if (data.status === 'language_changed' && data.language) {
 						currentLanguage.set(data.language as 'en' | 'zh');
 					}
+					if (data.status === 'level_changed' && (data as any).level) {
+						chineseLevel.set((data as any).level as ChineseLevel);
+					}
 
 					const statusMap: Record<string, ConnectionStatus> = {
 						transcribing: 'transcribing',
@@ -166,6 +206,11 @@ function connectWebSocket(): Promise<void> {
 				// Capture transcription
 				if (data.type === 'transcription' && data.transcription) {
 					latestTranscription.set(data.transcription);
+				}
+
+				// Capture acoustic tone analysis
+				if (data.type === 'tone_analysis' && data.tone_analysis) {
+					latestToneAnalysis.set(data.tone_analysis);
 				}
 
 				// Capture LLM response
@@ -340,6 +385,7 @@ export function clearLog(): void {
 	messageLog.set([]);
 	latestTranscription.set('');
 	latestLLMResponse.set('');
+	latestToneAnalysis.set(null);
 
 	// Also tell the backend to clear LLM history
 	if (ws && ws.readyState === WebSocket.OPEN) {

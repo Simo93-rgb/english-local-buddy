@@ -30,18 +30,23 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # GPU / Model paths
-    WHISPER_MODEL: str = "large-v3"
+    WHISPER_MODEL: str = "large-v3-turbo"
+    WHISPER_DEVICE: str = "cuda"
+    WHISPER_COMPUTE_TYPE: str = "int8_float16"
     DEFAULT_LANGUAGE: str = "en"
 
     # LLM (Unsloth Studio – OpenAI-compatible API)
     LLM_BASE_URL: str = "http://127.0.0.1:8888/v1"
-    LLM_MODEL: str = "unsloth/gemma-4-12b-it-GGUF"
+    LLM_MODEL: str = "empero-ai/Qwen3.8-9B-Distill-GGUF"
     LLM_API_KEY: str = Field(default_factory=_get_unsloth_api_key)
 
     # Prompts
     PROMPT_DIR: str = str(Path(__file__).parent / "prompts")
     SYSTEM_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "english_partner.md")
-    CHINESE_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor.md")
+    CHINESE_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor_beginner.md")
+    CHINESE_BEGINNER_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor_beginner.md")
+    CHINESE_INTERMEDIATE_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_tutor_intermediate.md")
+    CHINESE_ADVANCED_PROMPT_PATH: str = str(Path(__file__).parent / "prompts" / "chinese_buddy_advanced.md")
 
     # TTS (all female voices)
     TTS_VOICE: str = "en-US-AvaMultilingualNeural"
@@ -54,6 +59,8 @@ class Settings(BaseSettings):
 
     # User History & Progress tracking settings
     HISTORY_DIR: str = "user_history"
+    REPORT_FILENAME: str = "user_report.md"
+    CHINESE_REPORT_FILENAME: str = "user_chinese_report.md"
 
     class Config:
         env_file = ".env"
