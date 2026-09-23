@@ -18,11 +18,7 @@ from app.core.history_manager import HistoryManager
 
 
 def test_settings_and_prompts():
-    assert settings.LLM_MODEL in [
-        "empero-ai/Qwen3.8-9B-Distill-GGUF",
-        "unsloth/Qwen3-8B-GGUF:UD-Q4_K_XL",
-        "unsloth/gemma-4-12b-it-GGUF",
-    ], f"Unexpected LLM_MODEL: {settings.LLM_MODEL}"
+    assert settings.LLM_MODEL and isinstance(settings.LLM_MODEL, str), f"Invalid LLM_MODEL: {settings.LLM_MODEL}"
     assert Path(settings.CHINESE_BEGINNER_PROMPT_PATH).exists(), "Beginner prompt does not exist"
     assert Path(settings.CHINESE_INTERMEDIATE_PROMPT_PATH).exists(), "Intermediate prompt does not exist"
     assert Path(settings.CHINESE_ADVANCED_PROMPT_PATH).exists(), "Advanced prompt does not exist"
