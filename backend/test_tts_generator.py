@@ -115,10 +115,82 @@ def test_polyglot_regression_voice_mapping():
     print("  -> test_polyglot_regression_voice_mapping verified successfully! ✅")
 
 
+def test_polyglot_beginner_rate_override():
+    print("Testing polyglot beginner rate override...")
+    tts_manager = TTSManager(voice=settings.TTS_VOICE)
+
+    text = "<it>Ascolta:</it> <zh>mǎ</zh>"
+    language = "zh"
+    level = "beginner_tutor"
+
+    # Compute zh_rate according to main.py logic
+    zh_rate = "-25%" if (language == "zh" and level == "beginner_tutor") else "+0%"
+    assert zh_rate == "-25%"
+
+    recorded_calls = []
+    original_generate_audio = tts_manager.generate_audio
+
+    async def spy_generate_audio(seg_text, voice=None, rate="+0%", pitch="+0Hz"):
+        recorded_calls.append({
+            "text": seg_text,
+            "voice": voice,
+            "rate": rate,
+            "pitch": pitch,
+        })
+        return await original_generate_audio(seg_text, voice=voice, rate=rate, pitch=pitch)
+
+    tts_manager.generate_audio = spy_generate_audio
+
+    async def _run_beginner():
+        audio = await tts_manager.generate_polyglot_audio(
+            text,
+            default_language=language,
+            default_fallback_language="it",
+            zh_rate=zh_rate,
+        )
+        assert len(audio) > 500, "Audio generated for beginner tutor should not be empty"
+
+    asyncio.run(_run_beginner())
+
+    assert len(recorded_calls) == 2, f"Expected 2 segments synthesized, got {len(recorded_calls)}"
+
+    it_call = next(c for c in recorded_calls if "Ascolta" in c["text"])
+    assert it_call["rate"] == "+0%", f"Expected rate '+0%' for Italian, got {it_call['rate']}"
+    assert it_call["voice"] == settings.TTS_VOICE_IT
+
+    zh_call = next(c for c in recorded_calls if "mǎ" in c["text"])
+    assert zh_call["rate"] == "-25%", f"Expected rate '-25%' for Chinese beginner, got {zh_call['rate']}"
+    assert zh_call["voice"] == settings.TTS_VOICE_ZH
+
+    # Also verify intermediate level produces +0% for Chinese
+    recorded_calls.clear()
+    inter_level = "intermediate"
+    inter_zh_rate = "-25%" if (language == "zh" and inter_level == "beginner_tutor") else "+0%"
+    assert inter_zh_rate == "+0%"
+
+    async def _run_intermediate():
+        audio = await tts_manager.generate_polyglot_audio(
+            text,
+            default_language=language,
+            default_fallback_language="it",
+            zh_rate=inter_zh_rate,
+        )
+        assert len(audio) > 500, "Audio generated for intermediate tutor should not be empty"
+
+    asyncio.run(_run_intermediate())
+
+    zh_inter_call = next(c for c in recorded_calls if "mǎ" in c["text"])
+    assert zh_inter_call["rate"] == "+0%", f"Expected rate '+0%' for Chinese intermediate, got {zh_inter_call['rate']}"
+
+    print("  -> test_polyglot_beginner_rate_override verified successfully! ✅")
+
+
 if __name__ == "__main__":
     test_pinyin_conversion()
     test_polyglot_regression_voice_mapping()
+    test_polyglot_beginner_rate_override()
     test_tts_audio_synthesis()
     test_api_tts_endpoint()
     print("\nALL TTS GENERATOR TESTS PASSED! 🎉")
+
 

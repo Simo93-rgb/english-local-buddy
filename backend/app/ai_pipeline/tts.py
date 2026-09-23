@@ -357,6 +357,8 @@ class TTSManager:
         text: str,
         default_language: str = "en",
         default_fallback_language: str | None = None,
+        zh_rate: str = "+0%",
+        rates: dict[str, str] | None = None,
     ) -> bytes:
         """
         Synthesize text containing language tags (e.g. <it>...</it>, <zh>...</zh>)
@@ -371,6 +373,10 @@ class TTSManager:
             Session language ("zh" or "en").
         default_fallback_language : str | None
             Fallback language for discursive text or untagged content (e.g. "it" for Chinese tutor).
+        zh_rate : str
+            Speaking rate override for Chinese segments (e.g. "-25%" for beginner tutor, "+0%" default).
+        rates : dict[str, str] | None
+            Optional explicit mapping of language code to speaking rate string.
 
         Returns
         -------
@@ -386,15 +392,21 @@ class TTSManager:
         segments = parse_language_tags(text, default_lang=fallback)
         if not segments:
             clean_text = strip_language_tags(text)
-            return await self.generate_audio(clean_text, voice=self.get_voice_for_language(fallback, default_fallback=fallback))
+            fallback_rate = rates.get(fallback) if rates and fallback in rates else (zh_rate if fallback.startswith("zh") else "+0%")
+            return await self.generate_audio(
+                clean_text,
+                voice=self.get_voice_for_language(fallback, default_fallback=fallback),
+                rate=fallback_rate,
+            )
 
         # Synthesize each language segment concurrently
         async def _synth_segment(lang: str, seg_text: str) -> bytes:
             voice = self.get_voice_for_language(lang, default_fallback=fallback)
+            rate = rates.get(lang) if rates and lang in rates else (zh_rate if lang.startswith("zh") else "+0%")
             try:
-                return await self.generate_audio(seg_text, voice=voice)
+                return await self.generate_audio(seg_text, voice=voice, rate=rate)
             except Exception as exc:
-                logger.warning("Failed to synthesize segment '%s' with voice '%s': %s", seg_text[:30], voice, exc)
+                logger.warning("Failed to synthesize segment '%s' with voice '%s' (rate=%s): %s", seg_text[:30], voice, rate, exc)
                 return b""
 
         tasks = [_synth_segment(lang, seg_text) for lang, seg_text in segments if seg_text.strip()]
