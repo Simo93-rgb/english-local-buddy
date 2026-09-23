@@ -1,16 +1,16 @@
 # Graph Report - English Buddy  (2026-09-23)
 
 ## Corpus Check
-- 47 files · ~100,939 words
+- 47 files · ~103,961 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 840 nodes · 1068 edges · 118 communities (113 shown, 5 thin omitted)
+- 859 nodes · 1087 edges · 118 communities (113 shown, 5 thin omitted)
 - Extraction: 96% EXTRACTED · 4% INFERRED · 0% AMBIGUOUS · INFERRED: 41 edges (avg confidence: 0.71)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `312543c2`
+- Built from commit: `687385a8`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -22,6 +22,7 @@
 - [[_COMMUNITY_Frontend Build & Config (4)|Frontend Build & Config (4)]]
 - [[_COMMUNITY_Tauri Desktop Shell (5)|Tauri Desktop Shell (5)]]
 - [[_COMMUNITY_Pronunciation & GOP Assessment|Pronunciation & GOP Assessment]]
+- [[_COMMUNITY_Community 7|Community 7]]
 - [[_COMMUNITY_Tauri ACL Permissions (8)|Tauri ACL Permissions (8)]]
 - [[_COMMUNITY_Whisper ASR Pipeline|Whisper ASR Pipeline]]
 - [[_COMMUNITY_Community 10|Community 10]]
@@ -75,7 +76,9 @@
 - [[_COMMUNITY_Tauri ACL Permissions (58)|Tauri ACL Permissions (58)]]
 - [[_COMMUNITY_Tauri ACL Permissions (59)|Tauri ACL Permissions (59)]]
 - [[_COMMUNITY_Tauri ACL Permissions (60)|Tauri ACL Permissions (60)]]
+- [[_COMMUNITY_Community 61|Community 61]]
 - [[_COMMUNITY_Tauri ACL Permissions (62)|Tauri ACL Permissions (62)]]
+- [[_COMMUNITY_Community 63|Community 63]]
 - [[_COMMUNITY_Tauri ACL Permissions (64)|Tauri ACL Permissions (64)]]
 - [[_COMMUNITY_Tauri ACL Permissions (65)|Tauri ACL Permissions (65)]]
 - [[_COMMUNITY_Tauri ACL Permissions (66)|Tauri ACL Permissions (66)]]
@@ -93,7 +96,7 @@
 - [[_COMMUNITY_Community 79|Community 79]]
 - [[_COMMUNITY_Tauri ACL Permissions (80)|Tauri ACL Permissions (80)]]
 - [[_COMMUNITY_Tauri ACL Permissions (81)|Tauri ACL Permissions (81)]]
-- [[_COMMUNITY_Tauri ACL Permissions (82)|Tauri ACL Permissions (82)]]
+- [[_COMMUNITY_Community 82|Community 82]]
 - [[_COMMUNITY_Tauri ACL Permissions (83)|Tauri ACL Permissions (83)]]
 - [[_COMMUNITY_Tauri Schema Definitions (85)|Tauri Schema Definitions (85)]]
 - [[_COMMUNITY_Tauri Schema Definitions (86)|Tauri Schema Definitions (86)]]
@@ -114,10 +117,7 @@
 - [[_COMMUNITY_Community 111|Community 111]]
 - [[_COMMUNITY_Community 112|Community 112]]
 - [[_COMMUNITY_Community 113|Community 113]]
-- [[_COMMUNITY_Community 114|Community 114]]
-- [[_COMMUNITY_Community 115|Community 115]]
 - [[_COMMUNITY_Community 116|Community 116]]
-- [[_COMMUNITY_Community 118|Community 118]]
 - [[_COMMUNITY_Community 119|Community 119]]
 - [[_COMMUNITY_Community 120|Community 120]]
 - [[_COMMUNITY_Community 121|Community 121]]
@@ -157,11 +157,11 @@
 
 ### Community 0 - "Tauri ACL Permissions (0)"
 Cohesion: 0.05
-Nodes (41): commands, description, identifier, commands, description, identifier, commands, description (+33 more)
+Nodes (44): commands, description, identifier, commands, description, identifier, commands, description (+36 more)
 
 ### Community 1 - "Tauri ACL Permissions (1)"
 Cohesion: 0.06
-Nodes (36): commands, description, identifier, commands, description, identifier, commands, description (+28 more)
+Nodes (33): commands, description, identifier, commands, description, identifier, commands, description (+25 more)
 
 ### Community 2 - "Frontend Audio Store & WS"
 Cohesion: 0.05
@@ -180,12 +180,16 @@ Cohesion: 0.10
 Nodes (19): debugApplicationIdSuffix, app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl (+11 more)
 
 ### Community 6 - "Pronunciation & GOP Assessment"
-Cohesion: 0.40
-Nodes (4): anyOf, description, $schema, title
+Cohesion: 0.10
+Nodes (17): calculate_gop(), ForcedAligner, GOPScorer, Pronunciation Assessment Module ================================= Stubs for Forc, # TODO: Implement GOP scoring, High-level function: run forced alignment on raw audio bytes.      Parameters, # TODO: Implement Montreal Forced Aligner here, High-level function: compute Goodness-of-Pronunciation scores.      Parameters (+9 more)
+
+### Community 7 - "Community 7"
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-app-show
 
 ### Community 8 - "Tauri ACL Permissions (8)"
-Cohesion: 0.16
-Nodes (19): core, core:app, default_permission, global_scope_schema, permission_sets, default_permission, default_permission, global_scope_schema (+11 more)
+Cohesion: 0.19
+Nodes (16): core, default_permission, default_permission, core:event, default_permission, global_scope_schema, permission_sets, global_scope_schema (+8 more)
 
 ### Community 9 - "Whisper ASR Pipeline"
 Cohesion: 0.14
@@ -209,7 +213,7 @@ Nodes (13): definitions, Number, PermissionEntry, Target, Value, anyOf, descript
 
 ### Community 14 - "Tauri ACL Permissions (14)"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-fetch-data-store-identifiers
+Nodes (4): commands, description, identifier, allow-app-hide
 
 ### Community 15 - "Tauri Schema Definitions (15)"
 Cohesion: 0.20
@@ -236,12 +240,12 @@ Cohesion: 0.20
 Nodes (10): type, webviews, windows, items, description, items, type, description (+2 more)
 
 ### Community 21 - "LLM Conversation Manager"
-Cohesion: 0.16
-Nodes (11): Path, test_history_manager_routing(), HistoryManager, History Manager – Progress tracking and conversation logging ===================, Manages incremental conversation logging and progress report updates.     Suppor, Get the file path for the session's log file., Get the file path for the persistent report.         Routes to user_chinese_repo, Initialise the session log file with header metadata. (+3 more)
+Cohesion: 0.17
+Nodes (10): Path, HistoryManager, History Manager – Progress tracking and conversation logging ===================, Manages incremental conversation logging and progress report updates.     Suppor, Get the file path for the session's log file., Get the file path for the persistent report.         Routes to user_chinese_repo, Initialise the session log file with header metadata., Append a single turn (user or assistant) to the session log file on disk. (+2 more)
 
 ### Community 22 - "Tauri ACL Permissions (22)"
-Cohesion: 0.22
-Nodes (9): commands, description, identifier, commands, description, identifier, deny, allow-append (+1 more)
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-append
 
 ### Community 23 - "Tauri ACL Permissions (23)"
 Cohesion: 0.50
@@ -260,8 +264,8 @@ Cohesion: 0.29
 Nodes (6): default, description, identifier, local, permissions, windows
 
 ### Community 27 - "Frontend Audio Store & WS"
-Cohesion: 0.29
-Nodes (5): pinyin_numbered_to_tone(), Convert numbered pinyin (e.g. 'ni3 hao3', 'zhong1wen2', 'lu:4' or 'lv4')     int, Tests for HD TTS Audio Generator Tests pinyin conversion, audio synthesis with r, test_pinyin_conversion(), test_tts_audio_synthesis()
+Cohesion: 0.18
+Nodes (9): pinyin_numbered_to_tone(), Convert numbered pinyin (e.g. 'ni3 hao3', 'zhong1wen2', 'lu:4' or 'lv4')     int, generate_tts(), Payload for text-to-speech high-definition audio generation., Generate high-definition speech audio for Chinese Hanzi or Pinyin text.     Uses, TTSGenerateRequest, Tests for HD TTS Audio Generator Tests pinyin conversion, audio synthesis with r, test_pinyin_conversion() (+1 more)
 
 ### Community 28 - "Backend Configuration"
 Cohesion: 0.29
@@ -276,8 +280,8 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-bundle-type
 
 ### Community 31 - "Tauri Schema Definitions (31)"
-Cohesion: 0.05
-Nodes (45): calculate_gop(), ForcedAligner, GOPScorer, Pronunciation Assessment Module ================================= Stubs for Forc, # TODO: Implement GOP scoring, High-level function: run forced alignment on raw audio bytes.      Parameters, # TODO: Implement Montreal Forced Aligner here, High-level function: compute Goodness-of-Pronunciation scores.      Parameters (+37 more)
+Cohesion: 0.10
+Nodes (28): ndarray, BaseModel, compute_energy(), ensure_float32_array(), extract_pitch_contour(), Audio processing utilities. Provides librosa-based pitch (F0 contour) extraction, Compute short-time Root-Mean-Square (RMS) energy per frame., Resample audio waveform to target sample rate. (+20 more)
 
 ### Community 32 - "Tauri Schema Definitions (32)"
 Cohesion: 0.50
@@ -288,12 +292,12 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-bundle-type
 
 ### Community 34 - "Tauri ACL Permissions (34)"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-create-default
+Cohesion: 0.07
+Nodes (28): 1. Avvio del Server LLM, 1. Frontend Desktop: Tauri v2 + SvelteKit, 2. Avvio del Backend, 2. Streaming Audio Bidirezionale su WebSockets, 3. Avvio del Frontend, 3. Riconoscimento Vocale (ASR): Faster-Whisper su CUDA, 4. Intelligenza Linguistica: LLM Locale con Unsloth Studio, 5. Diagnostica Fonetica dei Toni Cinesi: F0 Pitch Tracking (+20 more)
 
 ### Community 35 - "Tauri ACL Permissions (35)"
-Cohesion: 0.20
-Nodes (13): clean_speech_segment(), is_chinese_or_pinyin(), parse_language_tags(), TTS (Text-to-Speech) Module ============================= MVP implementation usi, Detect whether a token is Chinese text (Hanzi) or a Mandarin Pinyin word with to, Sub-segment an Italian text fragment by rescuing any Hanzi or Pinyin tokens that, Strip markdown formatting and standalone bullet markers for natural speech synth, Parse text containing <it>...</it> and <zh>...</zh> tags into sequential (langua (+5 more)
+Cohesion: 0.29
+Nodes (6): 1. Runtime Configuration Architecture (`backend/app/core/config.py`), 2. Overriding Configuration via `.env`, 3. Modular System Prompts, 4. Client-Side Store Configuration (`frontend/src/lib/stores/audioStore.ts`), Configuration & Environment Architecture, Core Configuration Parameters
 
 ### Community 36 - "Tauri ACL Permissions (36)"
 Cohesion: 0.50
@@ -328,32 +332,32 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-name
 
 ### Community 44 - "Tauri ACL Permissions (44)"
-Cohesion: 0.40
-Nodes (5): commands, description, identifier, permissions, allow-popup
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-popup
 
 ### Community 45 - "Tauri ACL Permissions (45)"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-set-as-app-menu
 
 ### Community 46 - "Tauri ACL Permissions (46)"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-register-listener
+Cohesion: 0.25
+Nodes (8): commands, description, identifier, core:app, global_scope_schema, permission_sets, permissions, allow-register-listener
 
 ### Community 47 - "Tauri ACL Permissions (47)"
-Cohesion: 0.40
-Nodes (4): anyOf, description, $schema, title
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-prepend
 
 ### Community 48 - "Community 48"
-Cohesion: 0.17
-Nodes (10): MandarinToneAnalyzer, Acoustic analyzer for Mandarin tones using fundamental frequency (F0) contours., Extract Chinese pinyin syllables and their tone numbers (1-5) from text., Group consecutive voiced frames into distinct voiced syllable chunks., Classify a single voiced F0 contour into one of the 5 Mandarin tones.          R, Perform complete acoustic tone analysis on speech audio.          Parameters, ndarray, Test script for Chinese Tutor, MandarinToneAnalyzer, ASR bilingual prompts, and (+2 more)
+Cohesion: 0.09
+Nodes (24): MandarinToneAnalyzer, Acoustic analyzer for Mandarin tones using fundamental frequency (F0) contours., Extract Chinese pinyin syllables and their tone numbers (1-5) from text., Group consecutive voiced frames into distinct voiced syllable chunks., Classify a single voiced F0 contour into one of the 5 Mandarin tones.          R, Perform complete acoustic tone analysis on speech audio.          Parameters, clean_speech_segment(), is_chinese_or_pinyin() (+16 more)
 
 ### Community 49 - "Community 49"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-set-checked
 
 ### Community 50 - "Tauri ACL Permissions (50)"
-Cohesion: 0.25
-Nodes (8): description, identifier, permissions, commands, description, identifier, allow-app-show, deny-version
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, deny-version
 
 ### Community 51 - "Tauri ACL Permissions (51)"
 Cohesion: 0.15
@@ -372,16 +376,16 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-set-as-window-menu
 
 ### Community 55 - "Tauri ACL Permissions (55)"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-set-as-windows-menu-for-nsapp
+Cohesion: 0.22
+Nodes (9): commands, description, identifier, commands, description, identifier, deny, allow-remove-listener (+1 more)
 
 ### Community 56 - "Tauri ACL Permissions (56)"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-remove-listener
 
 ### Community 57 - "Tauri ACL Permissions (57)"
-Cohesion: 0.20
-Nodes (10): commands, commands, description, identifier, commands, description, identifier, allow (+2 more)
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-supports-multiple-windows
 
 ### Community 58 - "Tauri ACL Permissions (58)"
 Cohesion: 0.50
@@ -395,9 +399,17 @@ Nodes (4): default, description, type, description
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-set-text
 
+### Community 61 - "Community 61"
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, allow-text
+
 ### Community 62 - "Tauri ACL Permissions (62)"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-tauri-version
+
+### Community 63 - "Community 63"
+Cohesion: 0.40
+Nodes (4): anyOf, description, $schema, title
 
 ### Community 64 - "Tauri ACL Permissions (64)"
 Cohesion: 0.50
@@ -420,12 +432,12 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-default-window-icon
 
 ### Community 70 - "Tauri ACL Permissions (70)"
-Cohesion: 0.18
-Nodes (10): Architecture, English Buddy – Local Pronunciation Trainer, Features, Getting Started, Manual Backend Launch, Manual Frontend Launch, Prerequisites, Project Structure (+2 more)
+Cohesion: 0.40
+Nodes (4): anyOf, description, $schema, title
 
 ### Community 71 - "Tauri ACL Permissions (71)"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-get
+Cohesion: 0.22
+Nodes (9): commands, description, identifier, allow, commands, description, identifier, allow-is-checked (+1 more)
 
 ### Community 72 - "Tauri ACL Permissions (72)"
 Cohesion: 0.50
@@ -440,16 +452,16 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-identifier
 
 ### Community 75 - "Community 75"
-Cohesion: 0.22
-Nodes (10): generate_tts(), health_check(), lifespan(), English Buddy – FastAPI Backend ================================ Main entrypoint, Simple liveness probe., Payload for text-to-speech high-definition audio generation., Generate high-definition speech audio for Chinese Hanzi or Pinyin text.     Uses, FastAPI lifespan handler.     Load heavy ML models on startup, release on shutdo (+2 more)
+Cohesion: 0.19
+Nodes (12): health_check(), lifespan(), English Buddy – FastAPI Backend ================================ Main entrypoint, Simple liveness probe., Full conversational pipeline over a single WebSocket connection.      Protocol, Execute the full ASR → Tone Analysis → LLM → TTS pipeline and send results     b, FastAPI lifespan handler.     Load heavy ML models on startup, release on shutdo, _run_pipeline() (+4 more)
 
 ### Community 76 - "Tauri ACL Permissions (76)"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-name
 
 ### Community 77 - "Tauri ACL Permissions (77)"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-set-accelerator
+Cohesion: 0.40
+Nodes (5): commands, description, identifier, permissions, allow-create-default
 
 ### Community 78 - "Tauri ACL Permissions (78)"
 Cohesion: 0.50
@@ -457,7 +469,7 @@ Nodes (4): commands, description, identifier, deny-remove-data-store
 
 ### Community 79 - "Community 79"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-is-enabled
+Nodes (4): commands, description, identifier, allow-set-accelerator
 
 ### Community 80 - "Tauri ACL Permissions (80)"
 Cohesion: 0.50
@@ -467,13 +479,13 @@ Nodes (4): commands, description, identifier, deny-set-app-theme
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-set-dock-visibility
 
-### Community 82 - "Tauri ACL Permissions (82)"
+### Community 82 - "Community 82"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, deny-supports-multiple-windows
+Nodes (4): commands, description, identifier, deny-fetch-data-store-identifiers
 
 ### Community 83 - "Tauri ACL Permissions (83)"
-Cohesion: 0.33
-Nodes (5): 1. Global Settings (`backend/app/core/config.py`), 2. LLM System Prompt & Fallbacks (`backend/app/ai_pipeline/llm.py`), 3. Frontend WebSocket Logic (`frontend/src/lib/stores/audioStore.ts`), Configuration & Crucial Aspects, Handling Empty Responses
+Cohesion: 0.50
+Nodes (4): commands, description, identifier, deny-is-enabled
 
 ### Community 85 - "Tauri Schema Definitions (85)"
 Cohesion: 0.50
@@ -509,7 +521,7 @@ Nodes (4): Building, Creating a project, Developing, sv
 
 ### Community 106 - "Community 106"
 Cohesion: 0.50
-Nodes (3): Available Documentation, English Buddy Documentation, How the App Works (Brief Overview)
+Nodes (3): Available Documentation, English Buddy Documentation, High-Level Workflow
 
 ### Community 107 - "Community 107"
 Cohesion: 0.50
@@ -525,27 +537,15 @@ Nodes (4): commands, description, identifier, allow-get
 
 ### Community 112 - "Community 112"
 Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-is-checked
+Nodes (4): commands, description, identifier, deny-supports-multiple-windows
 
 ### Community 113 - "Community 113"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, allow-version
 
-### Community 114 - "Community 114"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-app-hide
-
-### Community 115 - "Community 115"
-Cohesion: 0.40
-Nodes (6): Full conversational pipeline over a single WebSocket connection.      Protocol, Execute the full ASR → Tone Analysis → LLM → TTS pipeline and send results     b, _run_pipeline(), websocket_audio(), English Buddy documentation roadmap, WebSocket
-
 ### Community 116 - "Community 116"
 Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-register-listener
-
-### Community 118 - "Community 118"
-Cohesion: 0.50
-Nodes (4): commands, description, identifier, allow-remove-listener
 
 ### Community 119 - "Community 119"
 Cohesion: 0.50
@@ -560,24 +560,24 @@ Cohesion: 0.50
 Nodes (4): commands, description, identifier, deny-tauri-version
 
 ## Knowledge Gaps
-- **358 isolated node(s):** `Config`, `start.sh script`, `LD_LIBRARY_PATH`, `name`, `private` (+353 more)
+- **374 isolated node(s):** `Config`, `start.sh script`, `LD_LIBRARY_PATH`, `name`, `private` (+369 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `allow` connect `Tauri ACL Permissions (57)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (1)`, `Tauri ACL Permissions (14)`, `Tauri ACL Permissions (22)`, `Tauri ACL Permissions (23)`, `Tauri ACL Permissions (30)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (33)`, `Tauri ACL Permissions (34)`, `Tauri ACL Permissions (36)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (38)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (40)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (43)`, `Tauri ACL Permissions (44)`, `Tauri ACL Permissions (45)`, `Tauri ACL Permissions (46)`, `Community 49`, `Tauri ACL Permissions (50)`, `Tauri ACL Permissions (52)`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (55)`, `Tauri ACL Permissions (56)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Tauri ACL Permissions (62)`, `Tauri ACL Permissions (64)`, `Tauri ACL Permissions (65)`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (69)`, `Tauri ACL Permissions (71)`, `Tauri ACL Permissions (72)`, `Tauri ACL Permissions (74)`, `Tauri ACL Permissions (76)`, `Tauri ACL Permissions (77)`, `Tauri ACL Permissions (78)`, `Community 79`, `Tauri ACL Permissions (80)`, `Tauri ACL Permissions (81)`, `Tauri ACL Permissions (82)`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 112`, `Community 113`, `Community 114`, `Community 116`, `Community 118`, `Community 119`, `Community 120`, `Community 121`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `deny` connect `Tauri ACL Permissions (22)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (1)`, `Tauri ACL Permissions (14)`, `Tauri ACL Permissions (23)`, `Tauri ACL Permissions (30)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (33)`, `Tauri ACL Permissions (34)`, `Tauri ACL Permissions (36)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (38)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (40)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (43)`, `Tauri ACL Permissions (44)`, `Tauri ACL Permissions (45)`, `Tauri ACL Permissions (46)`, `Community 49`, `Tauri ACL Permissions (50)`, `Tauri ACL Permissions (52)`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (55)`, `Tauri ACL Permissions (56)`, `Tauri ACL Permissions (57)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Tauri ACL Permissions (62)`, `Tauri ACL Permissions (64)`, `Tauri ACL Permissions (65)`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (69)`, `Tauri ACL Permissions (71)`, `Tauri ACL Permissions (72)`, `Tauri ACL Permissions (74)`, `Tauri ACL Permissions (76)`, `Tauri ACL Permissions (77)`, `Tauri ACL Permissions (78)`, `Community 79`, `Tauri ACL Permissions (80)`, `Tauri ACL Permissions (81)`, `Tauri ACL Permissions (82)`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 112`, `Community 113`, `Community 114`, `Community 116`, `Community 118`, `Community 119`, `Community 120`, `Community 121`?**
-  _High betweenness centrality (0.052) - this node is a cross-community bridge._
-- **Why does `permissions` connect `Tauri ACL Permissions (44)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (8)`, `Tauri ACL Permissions (22)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (34)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (45)`, `Community 49`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (55)`, `Tauri ACL Permissions (57)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (71)`, `Tauri ACL Permissions (72)`, `Tauri ACL Permissions (77)`, `Community 79`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 112`, `Community 119`?**
-  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `allow` connect `Tauri ACL Permissions (71)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (1)`, `Community 7`, `Tauri ACL Permissions (14)`, `Tauri ACL Permissions (22)`, `Tauri ACL Permissions (23)`, `Tauri ACL Permissions (30)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (33)`, `Tauri ACL Permissions (36)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (38)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (40)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (43)`, `Tauri ACL Permissions (44)`, `Tauri ACL Permissions (45)`, `Tauri ACL Permissions (46)`, `Tauri ACL Permissions (47)`, `Community 49`, `Tauri ACL Permissions (50)`, `Tauri ACL Permissions (52)`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (55)`, `Tauri ACL Permissions (56)`, `Tauri ACL Permissions (57)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Community 61`, `Tauri ACL Permissions (62)`, `Tauri ACL Permissions (64)`, `Tauri ACL Permissions (65)`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (69)`, `Tauri ACL Permissions (72)`, `Tauri ACL Permissions (74)`, `Tauri ACL Permissions (76)`, `Tauri ACL Permissions (77)`, `Tauri ACL Permissions (78)`, `Community 79`, `Tauri ACL Permissions (80)`, `Tauri ACL Permissions (81)`, `Community 82`, `Tauri ACL Permissions (83)`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 112`, `Community 113`, `Community 116`, `Community 119`, `Community 120`, `Community 121`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `deny` connect `Tauri ACL Permissions (55)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (1)`, `Community 7`, `Tauri ACL Permissions (14)`, `Tauri ACL Permissions (22)`, `Tauri ACL Permissions (23)`, `Tauri ACL Permissions (30)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (33)`, `Tauri ACL Permissions (36)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (38)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (40)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (43)`, `Tauri ACL Permissions (44)`, `Tauri ACL Permissions (45)`, `Tauri ACL Permissions (46)`, `Tauri ACL Permissions (47)`, `Community 49`, `Tauri ACL Permissions (50)`, `Tauri ACL Permissions (52)`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (56)`, `Tauri ACL Permissions (57)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Community 61`, `Tauri ACL Permissions (62)`, `Tauri ACL Permissions (64)`, `Tauri ACL Permissions (65)`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (69)`, `Tauri ACL Permissions (71)`, `Tauri ACL Permissions (72)`, `Tauri ACL Permissions (74)`, `Tauri ACL Permissions (76)`, `Tauri ACL Permissions (77)`, `Tauri ACL Permissions (78)`, `Community 79`, `Tauri ACL Permissions (80)`, `Tauri ACL Permissions (81)`, `Community 82`, `Tauri ACL Permissions (83)`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 112`, `Community 113`, `Community 116`, `Community 119`, `Community 120`, `Community 121`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `permissions` connect `Tauri ACL Permissions (77)` to `Tauri ACL Permissions (0)`, `Tauri ACL Permissions (8)`, `Tauri ACL Permissions (22)`, `Tauri Schema Definitions (32)`, `Tauri ACL Permissions (37)`, `Tauri ACL Permissions (39)`, `Tauri ACL Permissions (41)`, `Tauri ACL Permissions (42)`, `Tauri ACL Permissions (44)`, `Tauri ACL Permissions (45)`, `Tauri ACL Permissions (47)`, `Community 49`, `Community 53`, `Tauri ACL Permissions (54)`, `Tauri ACL Permissions (55)`, `Tauri ACL Permissions (58)`, `Tauri ACL Permissions (60)`, `Community 61`, `Tauri ACL Permissions (68)`, `Tauri ACL Permissions (71)`, `Tauri ACL Permissions (72)`, `Community 79`, `Tauri ACL Permissions (83)`, `Tauri Schema Definitions (88)`, `Community 107`, `Community 108`, `Community 111`, `Community 119`?**
+  _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Are the 5 inferred relationships involving `HistoryManager` (e.g. with `lifespan()` and `TTSGenerateRequest`) actually correct?**
   _`HistoryManager` has 5 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `ASR (Automatic Speech Recognition) Module ======================================`, `GPU-accelerated ASR engine backed by faster-whisper (CTranslate2).      Paramete`, `Load the faster-whisper model into VRAM with automatic fallback on CUDA OOM.` to the rest of the system?**
-  _431 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _447 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Tauri ACL Permissions (0)` be split into smaller, more focused modules?**
-  _Cohesion score 0.04878048780487805 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.045454545454545456 - nodes in this community are weakly interconnected._
 - **Should `Tauri ACL Permissions (1)` be split into smaller, more focused modules?**
-  _Cohesion score 0.05555555555555555 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06060606060606061 - nodes in this community are weakly interconnected._

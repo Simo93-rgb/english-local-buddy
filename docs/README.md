@@ -1,19 +1,24 @@
 # English Buddy Documentation
 
-Welcome to the documentation for English Buddy. This app serves as a local, privacy-first conversational AI trainer to help users practise and improve their spoken English.
+Welcome to the documentation for **English Buddy**, a privacy-first, local AI conversational and pronunciation trainer designed to assist learners in acquiring English and Mandarin fluency.
+
+---
 
 ## Available Documentation
 
-* [Architecture & Data Flow](./architecture.md) - Learn how the frontend, backend, and external ML services interact via WebSockets. Includes Mermaid flowcharts.
-* [Configuration & Crucial Settings](./configuration.md) - Find out where to edit the LLM, ASR, and TTS parameters, and how edge cases are handled.
+- [Architecture & Data Flow](./architecture.md): Deep dive into the Tauri + SvelteKit frontend, FastAPI server, WebSocket streaming, and asynchronous AI pipeline with sequence diagrams.
+- [Configuration & Environment Architecture](./configuration.md): Complete guide to application settings, Pydantic `BaseSettings`, environment variables, `.env` file overrides, and modular system prompts.
 
-## How the App Works (Brief Overview)
+---
 
-English Buddy is built using a decoupled architecture prioritizing speed and local execution:
+## High-Level Workflow
 
-1. **Frontend (Tauri + SvelteKit)**: The client captures audio via the browser's `MediaRecorder` API and streams it in extremely small chunks (WebM/Opus) to the backend over a single persistent WebSocket.
-2. **Backend (FastAPI)**: The server holds the WebSocket connection open, efficiently buffering the audio chunks in memory to avoid disk I/O bottlenecks.
-3. **ASR (Speech-to-Text)**: When the user clicks stop, the frontend ensures all chunks are flushed and sends a `STOP` signal. The backend then uses `faster-whisper` (on CUDA) to transcribe the entire audio buffer locally and extremely fast.
-4. **LLM (Language Model)**: The transcribed text is sent to an external, locally-running instance of LM Studio (`localhost:1234`) via an OpenAI-compatible API to generate a conversational, short, and friendly response.
-5. **TTS (Text-to-Speech)**: The text response is streamed to Microsoft Edge's TTS API, which returns high-quality, naturally spoken MP3 bytes.
-6. **Delivery**: The MP3 is base64-encoded and sent back through the WebSocket as a JSON payload, where the frontend decodes and auto-plays it.
+English Buddy leverages a decoupled, asynchronous architecture designed for sub-second conversational latency and local execution:
+
+1. **Frontend (Tauri v2 + SvelteKit)**: Captures user microphone audio via the Web MediaRecorder API in small 250ms chunks (WebM/Opus) and streams them over a persistent WebSocket to the backend.
+2. **Backend (FastAPI)**: Collects audio chunks in an in-memory byte buffer to eliminate disk I/O latency.
+3. **ASR (Speech-to-Text)**: On receiving the `STOP` signal, `faster-whisper` (running with CUDA acceleration) transcribes the buffered speech with near-zero latency.
+4. **Mandarin Tone Diagnostic (Optional)**: For Chinese sessions, `pypinyin` and `librosa` extract the speaker's F0 pitch contour, comparing it against canonical lexical tone trajectories.
+5. **LLM Engine (Local Reasoning)**: The transcribed text and conversational history are evaluated by a local LLM served via Unsloth Studio (`127.0.0.1:8888`), utilizing modular prompt personas (`backend/app/core/prompts/`).
+6. **Polyglot TTS (Speech Synthesis)**: Microsoft Edge's neural TTS engine synthesizes multilingual responses in parallel (e.g. Italian explanations accompanied by native Mandarin target pronunciations) and streams unified MP3 bytes back to the client.
+7. **Session History & Assessment**: Background processes log every turn incrementally to prevent data loss and run asynchronous assessments to maintain rolling learner reports.
