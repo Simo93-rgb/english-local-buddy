@@ -182,7 +182,7 @@ async def generate_tts(request: TTSGenerateRequest):
 
     # Generate an appropriate safe filename for download
     safe_slug = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", processed_text[:25]).strip("_") or "pronuncia"
-    filename = f"{safe_slug}_hd.mp3"
+    filename = f"{safe_slug}.mp3"
 
     return {
         "status": "ok",

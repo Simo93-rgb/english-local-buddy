@@ -283,10 +283,11 @@ export function disconnectWebSocket() {
 async function startCapture(): Promise<void> {
 	mediaStream = await navigator.mediaDevices.getUserMedia({
 		audio: {
-			channelCount: 1,
-			sampleRate: 16_000,
+			channelCount: { ideal: 1 },
+			sampleRate: { ideal: 16_000 },
 			echoCancellation: true,
 			noiseSuppression: true,
+			autoGainControl: true,
 		},
 	});
 
