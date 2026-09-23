@@ -55,10 +55,26 @@ type ConnectionStatus =
 	| 'error';
 
 export type ChineseLevel = 'beginner_tutor' | 'intermediate' | 'advanced_buddy';
+export type AppMode = 'tutor' | 'tts_studio';
+
+export interface TTSGenerateResult {
+	status: string;
+	audio_b64: string;
+	audio_format: string;
+	voice: string;
+	rate: string;
+	pitch: string;
+	processed_text: string;
+	size_bytes: number;
+	filename: string;
+}
 
 // ---------------------------------------------------------------------------
 // Stores
 // ---------------------------------------------------------------------------
+
+/** Current application mode: interactive conversational tutor or dedicated TTS Studio */
+export const currentMode = writable<AppMode>('tutor');
 
 /** Whether the microphone is currently recording */
 export const isRecording = writable<boolean>(false);
@@ -398,3 +414,47 @@ export function clearLog(): void {
 		ws.send('CLEAR');
 	}
 }
+
+/**
+ * Switch mode between interactive conversational tutor and TTS Studio.
+ */
+export function setAppMode(mode: AppMode): void {
+	currentMode.set(mode);
+}
+
+/**
+ * Call the backend REST API to synthesize high-definition audio.
+ */
+export async function generateTTSAudio(params: {
+	text: string;
+	language?: string;
+	rate?: string;
+	pitch?: string;
+	voice?: string;
+}): Promise<TTSGenerateResult> {
+	const backendHost =
+		typeof window !== 'undefined' && window.location.hostname
+			? window.location.hostname
+			: 'localhost';
+	const endpoint = `http://${backendHost}:8000/api/tts/generate`;
+
+	const response = await fetch(endpoint, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({
+			text: params.text,
+			language: params.language ?? 'zh',
+			rate: params.rate ?? '+0%',
+			pitch: params.pitch ?? '+0Hz',
+			voice: params.voice,
+		}),
+	});
+
+	if (!response.ok) {
+		const err = await response.json().catch(() => ({ detail: response.statusText }));
+		throw new Error(err.detail || 'Impossibile generare l\'audio');
+	}
+
+	return (await response.json()) as TTSGenerateResult;
+}
+

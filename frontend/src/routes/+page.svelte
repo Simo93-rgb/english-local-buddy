@@ -12,12 +12,24 @@
 		setLanguage,
 		chineseLevel,
 		setChineseLevel,
+		currentMode,
+		setAppMode,
 		latestToneAnalysis,
 		type ChineseLevel,
 	} from '$lib/stores/audioStore';
+	import TTSStudio from '$lib/components/TTSStudio.svelte';
 
 	let error = $state<string | null>(null);
 	let reportMessage = $state<string | null>(null);
+
+	function handleTutorSelect(value: string) {
+		if (value === 'tts_studio') {
+			setAppMode('tts_studio');
+		} else {
+			setAppMode('tutor');
+			setChineseLevel(value as ChineseLevel);
+		}
+	}
 
 	async function handleToggle() {
 		error = null;
@@ -103,7 +115,9 @@
 		</h1>
 		<p class="mt-2 text-gray-400 text-sm">
 			{#if $currentLanguage === 'zh'}
-				{#if $chineseLevel === 'beginner_tutor'}
+				{#if $currentMode === 'tts_studio'}
+					🎙️ Generatore Audio HD: Sintesi Vocale e Pronuncia Naturale di Pinyin e Hanzi
+				{:else if $chineseLevel === 'beginner_tutor'}
 					🎓 Tutor Bilingue Principianti: Fonetica, Vocali, Consonanti, Toni & Cultura
 				{:else if $chineseLevel === 'intermediate'}
 					🗣️ Pratica Guidata Bilingue: Dialoghi Quotidiani & Grammatica
@@ -119,7 +133,7 @@
 	<!-- Language Selector -->
 	<div class="mb-4 flex items-center bg-gray-900/90 p-1.5 rounded-2xl border border-gray-800 shadow-inner">
 		<button
-			onclick={() => setLanguage('en')}
+			onclick={() => { setLanguage('en'); setAppMode('tutor'); }}
 			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'en' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' : 'text-gray-400 hover:text-gray-200'}"
 		>
 			<span class="text-sm">🇬🇧</span>
@@ -134,35 +148,66 @@
 		</button>
 	</div>
 
-	<!-- Chinese Level Selector (only shown in Chinese mode) -->
+	<!-- Chinese Tutor & Tool Selector (Menu a tendina + quick tabs) -->
 	{#if $currentLanguage === 'zh'}
-		<div class="mb-6 flex flex-wrap items-center justify-center gap-1.5 bg-gray-900/70 p-1.5 rounded-2xl border border-rose-900/30 shadow-inner max-w-xl">
-			<button
-				onclick={() => setChineseLevel('beginner_tutor')}
-				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'beginner_tutor' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
-			>
-				<span>🎓</span>
-				<span>Principiante (Tutor Fonetica & Cultura)</span>
-			</button>
-			<button
-				onclick={() => setChineseLevel('intermediate')}
-				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'intermediate' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
-			>
-				<span>🗣️</span>
-				<span>Intermedio (Pratica)</span>
-			</button>
-			<button
-				onclick={() => setChineseLevel('advanced_buddy')}
-				class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$chineseLevel === 'advanced_buddy' ? 'bg-rose-600/90 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
-			>
-				<span>🚀</span>
-				<span>Avanzato (Buddy)</span>
-			</button>
+		<div class="mb-6 w-full max-w-xl flex flex-col items-center gap-2.5">
+			<!-- Menu a tendina principale -->
+			<div class="w-full flex items-center justify-between gap-3 bg-gray-900/90 p-2.5 px-4 rounded-2xl border border-rose-900/40 shadow-lg">
+				<label for="tutor-mode-select" class="text-xs font-semibold text-rose-300 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+					<span>Tutor / Strumento:</span>
+				</label>
+				<select
+					id="tutor-mode-select"
+					value={$currentMode === 'tts_studio' ? 'tts_studio' : $chineseLevel}
+					onchange={(e) => handleTutorSelect((e.target as HTMLSelectElement).value)}
+					class="w-full bg-gray-950 text-gray-100 text-xs sm:text-sm font-medium py-2 px-3 rounded-xl border border-rose-900/40 focus:border-rose-500 focus:outline-none cursor-pointer"
+				>
+					<optgroup label="Tutor Interattivi (Conversazione Vocale)">
+						<option value="beginner_tutor">🎓 Principiante (Fonetica, Toni & Cultura)</option>
+						<option value="intermediate">🗣️ Intermedio (Dialoghi & Pratica Guidata)</option>
+						<option value="advanced_buddy">🚀 Avanzato (Conversazione Libera)</option>
+					</optgroup>
+					<optgroup label="Strumenti Audio AI">
+						<option value="tts_studio">🎙️ Generatore Audio HD (Pinyin & Hanzi)</option>
+					</optgroup>
+				</select>
+			</div>
+
+			<!-- Quick tabs selector -->
+			<div class="flex flex-wrap items-center justify-center gap-1.5 bg-gray-900/70 p-1.5 rounded-2xl border border-rose-900/30 shadow-inner w-full">
+				<button
+					onclick={() => handleTutorSelect('beginner_tutor')}
+					class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tutor' && $chineseLevel === 'beginner_tutor' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+				>
+					<span>🎓 Principiante</span>
+				</button>
+				<button
+					onclick={() => handleTutorSelect('intermediate')}
+					class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tutor' && $chineseLevel === 'intermediate' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+				>
+					<span>🗣️ Intermedio</span>
+				</button>
+				<button
+					onclick={() => handleTutorSelect('advanced_buddy')}
+					class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tutor' && $chineseLevel === 'advanced_buddy' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-400 hover:text-rose-200'}"
+				>
+					<span>🚀 Avanzato</span>
+				</button>
+				<button
+					onclick={() => handleTutorSelect('tts_studio')}
+					class="px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tts_studio' ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30' : 'text-gray-400 hover:text-blue-300'}"
+				>
+					<span>🎙️ Generatore Audio HD</span>
+				</button>
+			</div>
 		</div>
 	{/if}
 
-	<!-- Connection status badge and controls -->
-	<div class="mb-6 flex items-center gap-3">
+	{#if $currentMode === 'tts_studio'}
+		<TTSStudio />
+	{:else}
+		<!-- Connection status badge and controls -->
+		<div class="mb-6 flex items-center gap-3">
 		<span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium {statusColors[$connectionStatus] ?? 'bg-gray-800 text-gray-400'}">
 			<span class="h-2 w-2 rounded-full {dotColors[$connectionStatus] ?? 'bg-gray-500'}"></span>
 			{statusLabels[$connectionStatus] ?? $connectionStatus}
@@ -355,4 +400,5 @@
 			{/if}
 		</div>
 	</section>
+	{/if}
 </main>
