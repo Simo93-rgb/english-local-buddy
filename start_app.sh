@@ -56,6 +56,18 @@ else
     echo -e "${GREEN}Starting app for the first time...${NC}"
 fi
 
+# Start Unsloth Server if not running
+echo -e "${YELLOW}Checking Unsloth server on port 8888...${NC}"
+if ! nc -z 127.0.0.1 8888 >/dev/null 2>&1; then
+    echo -e "${GREEN}Starting Unsloth server...${NC}"
+    unsloth start opencode --model unsloth/Qwen3-8B-GGUF:UD-Q4_K_XL >/dev/null 2>&1 &
+    UNSLOTH_PID=$!
+    echo -e "${GREEN}Unsloth server started with PID: $UNSLOTH_PID${NC}"
+    sleep 3
+else
+    echo -e "${GREEN}Unsloth server is already running.${NC}"
+fi
+
 # Start Backend
 echo -e "${GREEN}Starting backend...${NC}"
 cd "$BACKEND_DIR"

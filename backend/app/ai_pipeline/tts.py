@@ -301,7 +301,7 @@ class TTSManager:
         text: str,
         voice: str | None = None,
         rate: str = "+0%",
-        pitch: str = "+0%",
+        pitch: str = "+0Hz",
     ) -> bytes:
         """
         Convert text to speech with a single voice and return MP3 audio bytes.
