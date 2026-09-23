@@ -37,7 +37,8 @@ class Settings(BaseSettings):
 
     # LLM (Unsloth Studio – OpenAI-compatible API)
     LLM_BASE_URL: str = "http://127.0.0.1:8888/v1"
-    LLM_MODEL: str = "unsloth/Qwen3-8B-GGUF:UD-Q4_K_XL"
+    # LLM_MODEL: str = "unsloth/Qwen3-8B-GGUF:UD-Q4_K_XL"
+    LLM_MODEL: str = "unsloth/gemma-4-26B-A4B-it-qat-GGUF:UD-Q4_K_XL"
     LLM_API_KEY: str = Field(default_factory=_get_unsloth_api_key)
     LLM_ENABLE_THINKING: bool = False
 
