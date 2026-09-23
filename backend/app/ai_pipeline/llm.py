@@ -77,8 +77,9 @@ class LLMManager:
             base_url=self.base_url,
             api_key=self.api_key,
         )
-        # Rolling context: stores the last N (user, assistant) message dicts
-        self._history: deque[dict] = deque(maxlen=max_context_turns * 2)
+        # Rolling context: stores the last N (user, assistant) message dicts per session
+        self._histories: dict[str, deque[dict]] = {}
+        self._default_history: deque[dict] = deque(maxlen=max_context_turns * 2)
 
         logger.info(
             "LLMManager initialised (model=%s, base_url=%s, prompt_path=%s, context=%d turns)",
@@ -87,6 +88,19 @@ class LLMManager:
             self.prompt_path,
             max_context_turns,
         )
+
+    @property
+    def _history(self) -> deque[dict]:
+        """Backward-compatible access to the default history."""
+        return self._default_history
+
+    def get_history(self, session_id: str | None = None) -> deque[dict]:
+        """Get or initialize history deque for a specific session."""
+        if not session_id:
+            return self._default_history
+        if session_id not in self._histories:
+            self._histories[session_id] = deque(maxlen=self.max_context_turns * 2)
+        return self._histories[session_id]
 
     def reload_prompt(self) -> None:
         """Reload system prompt from disk."""
@@ -123,12 +137,17 @@ class LLMManager:
         except Exception as exc:
             logger.warning("Failed to auto-load model in Unsloth: %s", exc)
 
-    async def get_response(self, user_text: str, system_prompt: str | None = None) -> str:
+    async def get_response(
+        self,
+        user_text: str,
+        system_prompt: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         """
         Send the user's text to the LLM and return the assistant's reply.
 
         The conversation history is maintained automatically so the bot
-        remembers recent exchanges.
+        remembers recent exchanges in this session.
 
         Parameters
         ----------
@@ -136,6 +155,8 @@ class LLMManager:
             What the user said (ASR transcription).
         system_prompt : str | None
             Optional per-request system prompt override.
+        session_id : str | None
+            Session identifier to maintain isolated conversation history.
 
         Returns
         -------
@@ -144,14 +165,16 @@ class LLMManager:
         """
         import re
 
+        history = self.get_history(session_id)
+
         # Append the user message to history
-        self._history.append({"role": "user", "content": user_text})
+        history.append({"role": "user", "content": user_text})
 
         # Build the full message list: system + rolling history
         active_prompt = system_prompt or self._system_prompt
         messages = [
             {"role": "system", "content": active_prompt},
-            *list(self._history),
+            *list(history),
         ]
 
         extra_body: dict[str, Any] = {}
@@ -181,14 +204,14 @@ class LLMManager:
                     )
                 except Exception as retry_exc:
                     logger.error("LLM retry failed: %s", retry_exc)
-                    if self._history and self._history[-1]["role"] == "user":
-                        self._history.pop()
+                    if history and history[-1]["role"] == "user":
+                        history.pop()
                     raise
             else:
                 logger.error("LLM request failed: %s", exc)
                 # Remove the user message we just added since we failed
-                if self._history and self._history[-1]["role"] == "user":
-                    self._history.pop()
+                if history and history[-1]["role"] == "user":
+                    history.pop()
                 raise
 
         assistant_text = response.choices[0].message.content
@@ -214,16 +237,22 @@ class LLMManager:
         if not assistant_text:
             logger.warning("LLM returned an empty response. Falling back to default message.")
             assistant_text = "I'm sorry, I didn't quite catch that. Could you say it again?"
-            if self._history and self._history[-1]["role"] == "user":
-                self._history.pop()
+            if history and history[-1]["role"] == "user":
+                history.pop()
         else:
             # Append valid assistant reply to history
-            self._history.append({"role": "assistant", "content": assistant_text})
+            history.append({"role": "assistant", "content": assistant_text})
 
-        logger.info("LLM response: %s", assistant_text[:80])
+        logger.info("LLM response (session=%s): %s", session_id or "default", assistant_text[:80])
         return assistant_text
 
-    def clear_history(self) -> None:
-        """Reset the conversation context."""
-        self._history.clear()
-        logger.info("LLM conversation history cleared.")
+    def clear_history(self, session_id: str | None = None) -> None:
+        """Reset the conversation context for a session or globally."""
+        if session_id:
+            if session_id in self._histories:
+                self._histories[session_id].clear()
+                logger.info("LLM conversation history cleared for session: %s", session_id)
+        else:
+            self._default_history.clear()
+            self._histories.clear()
+            logger.info("All LLM conversation histories cleared.")

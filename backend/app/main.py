@@ -260,13 +260,23 @@ async def websocket_audio(ws: WebSocket):
 
                         if msg_type == "SET_LANGUAGE":
                             new_lang = str(parsed.get("language", "")).strip().lower()
-                            if new_lang:
+                            if new_lang and new_lang != current_language:
+                                # Finalize previous language session in background
+                                if history_manager and session_id:
+                                    asyncio.create_task(history_manager.finalize_session(session_id, language=current_language))
+                                if llm_manager and session_id:
+                                    llm_manager.clear_history(session_id)
                                 current_language = new_lang
-                                logger.info("Session %s switched language to: %s", session_id, current_language)
+                                session_id = datetime.now().strftime("%Y%m%d_%H%M%S") + f"_{current_language}"
+                                if history_manager:
+                                    await history_manager.start_session(session_id)
+                                last_tutor_response = ""
+                                logger.info("Switched to clean isolated session %s for language %s", session_id, current_language)
                                 await ws.send_text(json.dumps({
                                     "type": "status",
                                     "status": "language_changed",
                                     "language": current_language,
+                                    "session_id": session_id,
                                 }))
                                 continue
 
@@ -306,7 +316,7 @@ async def websocket_audio(ws: WebSocket):
 
                 elif text_msg == "CLEAR":
                     if llm_manager:
-                        llm_manager.clear_history()
+                        llm_manager.clear_history(session_id)
                     last_tutor_response = ""
                     await ws.send_text(json.dumps({
                         "type": "status",
@@ -501,7 +511,7 @@ async def _run_pipeline(
             prompt = load_system_prompt(settings.SYSTEM_PROMPT_PATH)
 
         llm_input = transcription + tone_diagnostic_note
-        llm_response = await llm_manager.get_response(llm_input, system_prompt=prompt)
+        llm_response = await llm_manager.get_response(llm_input, system_prompt=prompt, session_id=session_id)
     except Exception as exc:
         logger.error("LLM failed: %s", exc, exc_info=True)
         await ws.send_text(json.dumps({

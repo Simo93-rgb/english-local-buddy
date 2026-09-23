@@ -82,14 +82,17 @@ export const isRecording = writable<boolean>(false);
 /** WebSocket connection status */
 export const connectionStatus = writable<ConnectionStatus>('disconnected');
 
-/** Log of messages received from the backend */
-export const messageLog = writable<WSMessage[]>([]);
+/** Per-language message logs to ensure complete conversation isolation */
+const enMessageLog = writable<WSMessage[]>([]);
+const zhMessageLog = writable<WSMessage[]>([]);
 
-/** The latest transcription text */
-export const latestTranscription = writable<string>('');
+/** Per-language latest transcription */
+const enLatestTranscription = writable<string>('');
+const zhLatestTranscription = writable<string>('');
 
-/** The latest LLM response text */
-export const latestLLMResponse = writable<string>('');
+/** Per-language latest LLM response */
+const enLatestLLMResponse = writable<string>('');
+const zhLatestLLMResponse = writable<string>('');
 
 /** Current learning language */
 export const currentLanguage = writable<'en' | 'zh'>('en');
@@ -99,6 +102,24 @@ export const chineseLevel = writable<ChineseLevel>('beginner_tutor');
 
 /** The latest acoustic tone assessment result */
 export const latestToneAnalysis = writable<ToneAnalysisData | null>(null);
+
+/** Latest synthesized audio payload in base64 (for playback and download) */
+export const latestAudioB64 = writable<{ b64: string; format: string; text: string; language: 'en' | 'zh' } | null>(null);
+
+/** Log of messages received from the backend for the active language */
+export const messageLog = derived([currentLanguage, enMessageLog, zhMessageLog], ([$lang, $en, $zh]) =>
+	$lang === 'zh' ? $zh : $en
+);
+
+/** The latest transcription text for the active language */
+export const latestTranscription = derived([currentLanguage, enLatestTranscription, zhLatestTranscription], ([$lang, $en, $zh]) =>
+	$lang === 'zh' ? $zh : $en
+);
+
+/** The latest LLM response text for the active language */
+export const latestLLMResponse = derived([currentLanguage, enLatestLLMResponse, zhLatestLLMResponse], ([$lang, $en, $zh]) =>
+	$lang === 'zh' ? $zh : $en
+);
 
 /** The latest message from the backend */
 export const latestMessage = derived(messageLog, ($log) =>
@@ -144,11 +165,16 @@ function playAudioBase64(b64Data: string, format: string = 'mp3'): void {
 // ---------------------------------------------------------------------------
 
 export function setLanguage(lang: 'en' | 'zh') {
+	const prev = get(currentLanguage);
+	if (prev === lang) return;
+
 	currentLanguage.set(lang);
-	if (ws && ws.readyState === WebSocket.OPEN) {
-		ws.send(JSON.stringify({ type: 'SET_LANGUAGE', language: lang }));
-		console.log('[audioStore] Sent SET_LANGUAGE command:', lang);
-	}
+
+	// Completely isolate sessions: disconnect old WebSocket so the backend
+	// finalizes the session report and resets conversation context.
+	// When user records or speaks in the new language, a fresh WebSocket will connect.
+	disconnectWebSocket();
+	console.log(`[audioStore] Switched language to ${lang} and closed previous session connection.`);
 }
 
 export function setChineseLevel(level: ChineseLevel) {
@@ -219,34 +245,52 @@ function connectWebSocket(): Promise<void> {
 					if (mapped) connectionStatus.set(mapped);
 				}
 
+				const activeLang = get(currentLanguage);
+
 				// Capture transcription
 				if (data.type === 'transcription' && data.transcription) {
-					latestTranscription.set(data.transcription);
+					if (activeLang === 'zh') {
+						zhLatestTranscription.set(data.transcription);
+					} else {
+						enLatestTranscription.set(data.transcription);
+					}
 				}
 
-				// Capture acoustic tone analysis
+				// Capture acoustic tone analysis (Chinese only)
 				if (data.type === 'tone_analysis' && data.tone_analysis) {
 					latestToneAnalysis.set(data.tone_analysis);
 				}
 
 				// Capture LLM response
 				if (data.type === 'llm_response' && data.llm_text) {
-					latestLLMResponse.set(data.llm_text);
+					if (activeLang === 'zh') {
+						zhLatestLLMResponse.set(data.llm_text);
+					} else {
+						enLatestLLMResponse.set(data.llm_text);
+					}
 				}
 
-				// Auto-play TTS audio
+				// Auto-play TTS audio & record latest audio for potential download
 				if (data.type === 'tts_audio' && data.audio_b64) {
+					const spokenText = activeLang === 'zh' ? get(zhLatestLLMResponse) : get(enLatestLLMResponse);
+					latestAudioB64.set({
+						b64: data.audio_b64,
+						format: data.audio_format || 'mp3',
+						text: spokenText,
+						language: activeLang,
+					});
 					playAudioBase64(data.audio_b64, data.audio_format || 'mp3');
 				}
 
-				// Log non-status messages to conversation history
+				// Log non-status messages to conversation history of the active language
 				if (data.type !== 'status') {
+					const targetLog = activeLang === 'zh' ? zhMessageLog : enMessageLog;
 					if (data.type === 'tone_analysis') {
 						if (data.tone_analysis?.tones && data.tone_analysis.tones.length > 0) {
-							messageLog.update((log) => [...log, data]);
+							targetLog.update((log) => [...log, data]);
 						}
 					} else {
-						messageLog.update((log) => [...log, data]);
+						targetLog.update((log) => [...log, data]);
 					}
 				}
 			} catch (err) {
@@ -405,12 +449,20 @@ export async function toggleRecording(): Promise<void> {
  * Clear the message log and LLM conversation history.
  */
 export function clearLog(): void {
-	messageLog.set([]);
-	latestTranscription.set('');
-	latestLLMResponse.set('');
-	latestToneAnalysis.set(null);
+	const activeLang = get(currentLanguage);
+	if (activeLang === 'zh') {
+		zhMessageLog.set([]);
+		zhLatestTranscription.set('');
+		zhLatestLLMResponse.set('');
+		latestToneAnalysis.set(null);
+	} else {
+		enMessageLog.set([]);
+		enLatestTranscription.set('');
+		enLatestLLMResponse.set('');
+	}
+	latestAudioB64.set(null);
 
-	// Also tell the backend to clear LLM history
+	// Also tell the backend to clear LLM history for this session
 	if (ws && ws.readyState === WebSocket.OPEN) {
 		ws.send('CLEAR');
 	}
