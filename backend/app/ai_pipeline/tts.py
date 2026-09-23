@@ -52,6 +52,79 @@ ITALIAN_ACCENTED_WORDS = {
 
 PINYIN_TONE_CHARS = set("āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ")
 
+PINYIN_TONE_MAP = {
+    "a": "āáǎàa",
+    "e": "ēéěèe",
+    "o": "ōóǒòo",
+    "i": "īíǐìi",
+    "u": "ūúǔùu",
+    "v": "ǖǘǚǜü",
+    "ü": "ǖǘǚǜü",
+}
+
+
+def pinyin_numbered_to_tone(text: str) -> str:
+    """
+    Convert numbered pinyin (e.g. 'ni3 hao3', 'zhong1wen2', 'lu:4' or 'lv4')
+    into standard tone-accented pinyin ('nǐ hǎo', 'zhōngwén', 'lǜ').
+    Preserves text that is already accented or contains Hanzi or punctuation.
+    """
+    if not text:
+        return ""
+
+    def replace_syllable(match: re.Match) -> str:
+        syl = match.group(1)
+        tone_str = match.group(2)
+        try:
+            tone = int(tone_str)
+        except ValueError:
+            return match.group(0)
+
+        if tone < 1 or tone > 5:
+            return match.group(0)
+
+        syl_clean = syl.replace("u:", "ü").replace("v", "ü").replace("U:", "Ü").replace("V", "Ü")
+
+        if tone == 5:
+            return syl_clean
+
+        low = syl_clean.lower()
+        for v in ["a", "e"]:
+            idx = low.find(v)
+            if idx != -1:
+                is_upper = syl_clean[idx].isupper()
+                mark = PINYIN_TONE_MAP[v][tone - 1]
+                if is_upper:
+                    mark = mark.upper()
+                return syl_clean[:idx] + mark + syl_clean[idx + 1 :]
+
+        idx_ou = low.find("ou")
+        if idx_ou != -1:
+            is_upper = syl_clean[idx_ou].isupper()
+            mark = PINYIN_TONE_MAP["o"][tone - 1]
+            if is_upper:
+                mark = mark.upper()
+            return syl_clean[:idx_ou] + mark + syl_clean[idx_ou + 1 :]
+
+        last_vowel_idx = -1
+        vowel_char = ""
+        for i, ch in enumerate(low):
+            if ch in PINYIN_TONE_MAP:
+                last_vowel_idx = i
+                vowel_char = ch
+
+        if last_vowel_idx != -1:
+            is_upper = syl_clean[last_vowel_idx].isupper()
+            mark = PINYIN_TONE_MAP[vowel_char][tone - 1]
+            if is_upper:
+                mark = mark.upper()
+            return syl_clean[:last_vowel_idx] + mark + syl_clean[last_vowel_idx + 1 :]
+
+        return match.group(0)
+
+    pattern = r"([a-zA-ZüÜ:]+)([1-5])\b"
+    return re.sub(pattern, replace_syllable, text)
+
 
 def is_chinese_or_pinyin(word: str) -> bool:
     """
@@ -223,7 +296,13 @@ class TTSManager:
             return getattr(settings, "TTS_VOICE", "en-US-AvaMultilingualNeural")
         return self.voice
 
-    async def generate_audio(self, text: str, voice: str | None = None) -> bytes:
+    async def generate_audio(
+        self,
+        text: str,
+        voice: str | None = None,
+        rate: str = "+0%",
+        pitch: str = "+0%",
+    ) -> bytes:
         """
         Convert text to speech with a single voice and return MP3 audio bytes.
 
@@ -233,6 +312,10 @@ class TTSManager:
             The text to synthesise.
         voice : str | None
             Optional voice override (defaults to instance default voice).
+        rate : str
+            Speaking speed adjustment (e.g. '+0%', '-20%', '+20%').
+        pitch : str
+            Voice pitch adjustment (e.g. '+0Hz', '+50Hz').
 
         Returns
         -------
@@ -244,7 +327,12 @@ class TTSManager:
 
         target_voice = voice or self.voice
         try:
-            communicate = edge_tts.Communicate(text=text, voice=target_voice)
+            communicate = edge_tts.Communicate(
+                text=text,
+                voice=target_voice,
+                rate=rate,
+                pitch=pitch,
+            )
 
             # Collect all audio chunks into a buffer
             audio_buffer = io.BytesIO()

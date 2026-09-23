@@ -19,16 +19,18 @@ Audio flow
 import base64
 import json
 import logging
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.ai_pipeline.asr import WhisperASR
 from app.ai_pipeline.llm import LLMManager, load_system_prompt
-from app.ai_pipeline.tts import TTSManager, strip_language_tags
+from app.ai_pipeline.tts import TTSManager, pinyin_numbered_to_tone, strip_language_tags
 from app.ai_pipeline.pronunciation import MandarinToneAnalyzer
 from app.core.history_manager import HistoryManager
 
@@ -121,12 +123,79 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# REST health-check
+# REST endpoints
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health_check():
     """Simple liveness probe."""
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+
+
+class TTSGenerateRequest(BaseModel):
+    """Payload for text-to-speech high-definition audio generation."""
+
+    text: str = Field(..., description="Text in Hanzi or Pinyin to synthesize")
+    voice: str | None = Field(default=None, description="Voice identifier override")
+    rate: str = Field(default="+0%", description="Speaking speed adjustment (e.g. +0%, -20%)")
+    pitch: str = Field(default="+0Hz", description="Pitch adjustment (e.g. +0Hz)")
+    language: str = Field(default="zh", description="Language code (defaults to 'zh')")
+
+
+@app.post("/api/tts/generate")
+async def generate_tts(request: TTSGenerateRequest):
+    """
+    Generate high-definition speech audio for Chinese Hanzi or Pinyin text.
+    Uses the configured female neural voice (zh-CN-XiaoxiaoNeural).
+    Returns audio as base64-encoded MP3 plus metadata for playback and download.
+    """
+    global tts_manager
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    if tts_manager is None:
+        tts_manager = TTSManager(voice=settings.TTS_VOICE)
+
+    # 1. Normalize numbered pinyin (e.g. 'ni3 hao3' -> 'nǐ hǎo')
+    processed_text = pinyin_numbered_to_tone(request.text.strip())
+
+    # 2. Determine voice (default to Chinese female voice zh-CN-XiaoxiaoNeural)
+    voice = request.voice
+    if not voice:
+        voice = tts_manager.get_voice_for_language(request.language or "zh")
+
+    # 3. Generate audio
+    try:
+        audio_bytes = await tts_manager.generate_audio(
+            text=processed_text,
+            voice=voice,
+            rate=request.rate or "+0%",
+            pitch=request.pitch or "+0Hz",
+        )
+    except Exception as exc:
+        logger.error("TTS generation failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {exc}")
+
+    if not audio_bytes:
+        raise HTTPException(status_code=500, detail="TTS generation produced empty audio")
+
+    audio_b64 = base64.b64encode(audio_bytes).decode("ascii")
+
+    # Generate an appropriate safe filename for download
+    safe_slug = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", processed_text[:25]).strip("_") or "pronuncia"
+    filename = f"{safe_slug}_hd.mp3"
+
+    return {
+        "status": "ok",
+        "audio_b64": audio_b64,
+        "audio_format": "mp3",
+        "voice": voice,
+        "rate": request.rate,
+        "pitch": request.pitch,
+        "processed_text": processed_text,
+        "size_bytes": len(audio_bytes),
+        "filename": filename,
+    }
+
 
 
 # ---------------------------------------------------------------------------
