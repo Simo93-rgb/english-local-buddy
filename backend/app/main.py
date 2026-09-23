@@ -543,7 +543,12 @@ async def _run_pipeline(
         }))
 
         try:
-            audio_bytes = await tts_manager.generate_polyglot_audio(llm_response, default_language=language)
+            tts_fallback = "it" if language == "zh" and level in ("beginner_tutor", "intermediate") else ("zh" if language == "zh" else "en")
+            audio_bytes = await tts_manager.generate_polyglot_audio(
+                llm_response,
+                default_language=language,
+                default_fallback_language=tts_fallback,
+            )
         except Exception as exc:
             logger.error("TTS failed: %s", exc, exc_info=True)
             await ws.send_text(json.dumps({

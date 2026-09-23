@@ -7,7 +7,7 @@ import asyncio
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.ai_pipeline.tts import TTSManager, pinyin_numbered_to_tone
+from app.ai_pipeline.tts import TTSManager, pinyin_numbered_to_tone, parse_language_tags
 from app.core.config import settings
 
 
@@ -78,8 +78,47 @@ def test_api_tts_endpoint():
     print("  -> /api/tts/generate endpoint verified successfully! ✅")
 
 
+def test_polyglot_regression_voice_mapping():
+    print("Testing polyglot regression voice mapping...")
+    tts_manager = TTSManager(voice=settings.TTS_VOICE)
+
+    text = "Bravissimo! <it>Sei stato davvero fantastico.</it> <zh>你好</zh> <it>continuiamo!</it>"
+    segments = parse_language_tags(text, default_lang="it")
+
+    expected_segments = [
+        ("it", "Bravissimo! Sei stato davvero fantastico."),
+        ("zh", "你好"),
+        ("it", "continuiamo!"),
+    ]
+    assert segments == expected_segments, f"Expected {expected_segments}, got {segments}"
+
+    mapped_voices = [
+        (lang, seg, tts_manager.get_voice_for_language(lang, default_fallback="it"))
+        for lang, seg in segments
+    ]
+
+    for lang, seg, voice in mapped_voices:
+        if lang == "it":
+            assert voice == settings.TTS_VOICE_IT, f"Expected Italian voice {settings.TTS_VOICE_IT}, got {voice} for segment '{seg}'"
+        elif lang == "zh":
+            assert voice == settings.TTS_VOICE_ZH, f"Expected Chinese voice {settings.TTS_VOICE_ZH}, got {voice} for segment '{seg}'"
+
+        # Crucial regression check: NO segment in Chinese tutor session should map to Ava (en-US-AvaMultilingualNeural)
+        assert voice != settings.TTS_VOICE, f"Segment '{seg}' incorrectly mapped to default Ava English voice {settings.TTS_VOICE}"
+
+    # Also verify polyglot audio generation produces valid concatenated audio
+    async def _test_gen():
+        audio = await tts_manager.generate_polyglot_audio(text, default_language="zh", default_fallback_language="it")
+        assert len(audio) > 1000, "Polyglot audio output should not be empty"
+
+    asyncio.run(_test_gen())
+    print("  -> test_polyglot_regression_voice_mapping verified successfully! ✅")
+
+
 if __name__ == "__main__":
     test_pinyin_conversion()
+    test_polyglot_regression_voice_mapping()
     test_tts_audio_synthesis()
     test_api_tts_endpoint()
     print("\nALL TTS GENERATOR TESTS PASSED! 🎉")
+

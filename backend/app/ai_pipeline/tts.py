@@ -172,99 +172,94 @@ def clean_speech_segment(text: str) -> str:
         return ""
     return t
 
-from langdetect import detect, detect_langs
-
-def detect_language(text: str) -> str:
+def split_segment_by_chinese(text: str, base_lang: str = "it") -> list[tuple[str, str]]:
     """
-    Detect whether a clean speech segment is English or Italian using langdetect.
-    Defaults to 'en' for ambiguous or unsupported languages, as the multilingual voice handles English well.
+    Sub-segment a text fragment by rescuing any Hanzi or Pinyin tokens that were
+    accidentally left untagged or placed inside a non-Chinese block.
     """
-    clean = clean_speech_segment(text)
-    if not clean:
-        return "en"
-    try:
-        lang = detect(clean)
-        return "it" if lang == "it" else "en"
-    except:
-        return "en"
-
-def segment_sentence(sentence: str) -> list[tuple[str, str]]:
-    """
-    Segment a single sentence into Chinese/Pinyin vs Other components.
-    """
-    tokens = re.split(r"(\s+|[.,;:!?\"'“”«»()。！？]+)", sentence)
-    segments = []
-    current_lang = None
-    current_buffer = []
+    tokens = re.split(r"(\s+|[.,;:!?\"'“”«»()。！？]+)", text)
+    sub_segments: list[tuple[str, str]] = []
+    current_lang = base_lang
+    current_buffer: list[str] = []
 
     for tok in tokens:
         if not tok:
             continue
         if is_chinese_or_pinyin(tok):
-            tok_lang = "zh"
-        elif re.match(r"^[\s.,;:!?\"'“”«»()。！？]+$", tok):
-            tok_lang = None
-        else:
-            tok_lang = "other"
-            
-        if tok_lang == "zh":
-            if current_lang == "other" and current_buffer:
-                segments.append(("other", "".join(current_buffer)))
+            if current_lang != "zh" and current_buffer:
+                flushed = clean_speech_segment("".join(current_buffer))
+                if flushed:
+                    sub_segments.append((current_lang, flushed))
                 current_buffer = []
             current_lang = "zh"
             current_buffer.append(tok)
-        elif tok_lang == "other":
-            if current_lang == "zh" and current_buffer:
-                segments.append(("zh", "".join(current_buffer)))
-                current_buffer = []
-            current_lang = "other"
+        elif re.match(r"^[\s.,;:!?\"'“”«»()。！？]+$", tok):
             current_buffer.append(tok)
         else:
+            if current_lang == "zh" and current_buffer:
+                flushed = clean_speech_segment("".join(current_buffer))
+                if flushed:
+                    sub_segments.append(("zh", flushed))
+                current_buffer = []
+            current_lang = base_lang
             current_buffer.append(tok)
 
     if current_buffer:
-        segments.append((current_lang if current_lang else "other", "".join(current_buffer)))
-        
-    final_segments = []
-    for lang, content in segments:
-        if not content.strip():
-            continue
-        if lang == "zh":
-            final_segments.append(("zh", content))
-        else:
-            detected = detect_language(content)
-            final_segments.append((detected, content))
-    return final_segments
+        flushed = clean_speech_segment("".join(current_buffer))
+        if flushed:
+            sub_segments.append((current_lang, flushed))
 
-def parse_language_tags(text: str, default_lang: str = "en") -> list[tuple[str, str]]:
+    return sub_segments
+
+
+def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, str]]:
     """
-    Parse and segment multilingual text into (language, text) tuples.
-    This replaces naive tag parsing with robust sentence-level language detection (langdetect)
-    and precise token-level extraction of Hanzi/Pinyin.
+    Parse text containing <it>...</it>, <zh>...</zh>, and <en>...</en> tags into sequential (language, text) segments.
+    Untagged text (such as introductory interjections before <it> or text without any tags) defaults
+    strictly to default_lang (e.g. "it" for Chinese tutor sessions for Italian students), while
+    automatically rescuing any embedded Hanzi characters or Pinyin.
+    Consecutive segments of the same language are merged into single unified blocks before TTS synthesis.
     """
-    # First, strip any existing <it>, <zh>, <en> tags from the LLM to rely on pure text analysis
-    text = re.sub(r"</?(?:it|zh|en)>", " ", text, flags=re.IGNORECASE)
-    
-    # Split into sentences using punctuation
-    sentences = re.split(r'(?<=[.!?。！？\n])\s+', text)
-    
-    all_segments = []
-    for sent in sentences:
-        if not sent.strip():
+    if not text or not text.strip():
+        return []
+
+    tag_pattern = re.compile(r"(</?(?:it|zh|en)>)", re.IGNORECASE)
+    tokens = tag_pattern.split(text)
+
+    raw_segments: list[tuple[str, str]] = []
+    current_lang = default_lang
+
+    for tok in tokens:
+        if not tok:
             continue
-        all_segments.extend(segment_sentence(sent))
-        
-    # Merge contiguous segments of the same language
+        m_open = re.match(r"^<(it|zh|en)>$", tok, re.IGNORECASE)
+        m_close = re.match(r"^</(?:it|zh|en)>$", tok, re.IGNORECASE)
+        if m_open:
+            current_lang = m_open.group(1).lower()
+        elif m_close:
+            current_lang = default_lang
+        else:
+            clean = clean_speech_segment(tok)
+            if not clean:
+                continue
+            # If segment is labeled 'it' or 'en', rescue any accidental Hanzi or Pinyin
+            if current_lang in ("it", "en"):
+                sub_segs = split_segment_by_chinese(clean, base_lang=current_lang)
+                raw_segments.extend(sub_segs)
+            else:
+                raw_segments.append((current_lang, clean))
+
+    # Merge consecutive segments of the same language into single unified blocks
     merged: list[tuple[str, str]] = []
-    for lang, content in all_segments:
+    for lang, content in raw_segments:
         clean = clean_speech_segment(content)
         if not clean:
             continue
         if merged and merged[-1][0] == lang:
-            merged[-1] = (lang, merged[-1][1] + " " + clean)
+            merged[-1] = (lang, f"{merged[-1][1]} {clean}")
         else:
             merged.append((lang, clean))
-            
+
     return merged
 
 
@@ -283,7 +278,7 @@ class TTSManager:
         self.voice = voice
         logger.info("TTSManager initialised (voice=%s)", voice)
 
-    def get_voice_for_language(self, language: str) -> str:
+    def get_voice_for_language(self, language: str, default_fallback: str = "it") -> str:
         """Return recommended female Edge TTS voice identifier for given language code."""
         lang = (language or "").strip().lower()
         if lang.startswith("zh"):
@@ -292,6 +287,12 @@ class TTSManager:
             return getattr(settings, "TTS_VOICE_IT", "it-IT-ElsaNeural")
         elif lang.startswith("en"):
             return getattr(settings, "TTS_VOICE", "en-US-AvaMultilingualNeural")
+        
+        # If unmapped, use context default fallback
+        if default_fallback == "it":
+            return getattr(settings, "TTS_VOICE_IT", "it-IT-ElsaNeural")
+        elif default_fallback == "zh":
+            return getattr(settings, "TTS_VOICE_ZH", "zh-CN-XiaoxiaoNeural")
         return self.voice
 
     async def generate_audio(
@@ -351,7 +352,12 @@ class TTSManager:
             logger.error("TTS synthesis failed (voice=%s): %s", target_voice, exc)
             raise
 
-    async def generate_polyglot_audio(self, text: str, default_language: str = "en") -> bytes:
+    async def generate_polyglot_audio(
+        self,
+        text: str,
+        default_language: str = "en",
+        default_fallback_language: str | None = None,
+    ) -> bytes:
         """
         Synthesize text containing language tags (e.g. <it>...</it>, <zh>...</zh>)
         using distinct female native voices for each language segment, and
@@ -363,6 +369,8 @@ class TTSManager:
             The raw text from LLM, possibly containing <it> or <zh> tags.
         default_language : str
             Session language ("zh" or "en").
+        default_fallback_language : str | None
+            Fallback language for discursive text or untagged content (e.g. "it" for Chinese tutor).
 
         Returns
         -------
@@ -372,14 +380,17 @@ class TTSManager:
         if not text or not text.strip():
             return b""
 
-        segments = parse_language_tags(text, default_lang="it" if default_language == "zh" else default_language)
+        fallback = default_fallback_language or ("it" if default_language in ("zh", "it") else default_language)
+        if default_language == "zh" or fallback == "zh" or re.search(r"<zh>", text, re.IGNORECASE):
+            text = pinyin_numbered_to_tone(text)
+        segments = parse_language_tags(text, default_lang=fallback)
         if not segments:
             clean_text = strip_language_tags(text)
-            return await self.generate_audio(clean_text, voice=self.get_voice_for_language(default_language))
+            return await self.generate_audio(clean_text, voice=self.get_voice_for_language(fallback, default_fallback=fallback))
 
         # Synthesize each language segment concurrently
         async def _synth_segment(lang: str, seg_text: str) -> bytes:
-            voice = self.get_voice_for_language(lang)
+            voice = self.get_voice_for_language(lang, default_fallback=fallback)
             try:
                 return await self.generate_audio(seg_text, voice=voice)
             except Exception as exc:
