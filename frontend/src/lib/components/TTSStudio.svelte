@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { generateTTSAudio, type TTSGenerateResult } from '$lib/stores/audioStore';
+	import { save } from '@tauri-apps/plugin-dialog';
+	import { writeFile } from '@tauri-apps/plugin-fs';
 
 	// Component state
 	let inputText = $state<string>('');
@@ -8,6 +10,7 @@
 	let isGenerating = $state<boolean>(false);
 	let errorMessage = $state<string | null>(null);
 	let generatedResult = $state<TTSGenerateResult | null>(null);
+	let savedNotification = $state<{ type: 'success' | 'error'; message: string; path?: string } | null>(null);
 
 	// Audio player state
 	let audioElement: HTMLAudioElement | null = null;
@@ -99,6 +102,7 @@
 		}
 
 		errorMessage = null;
+		savedNotification = null;
 		isGenerating = true;
 
 		try {
@@ -172,15 +176,58 @@
 		}
 	}
 
-	function downloadAudio() {
+	async function downloadAudio() {
 		if (!audioBlobUrl || !generatedResult) return;
 
-		const a = document.createElement('a');
-		a.href = audioBlobUrl;
-		a.download = generatedResult.filename || 'pronuncia_chinese_buddy.mp3';
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
+		savedNotification = null;
+		const defaultFilename = generatedResult.filename || 'pronuncia_chinese_buddy.mp3';
+		const defaultDir = '/home/simone/Musica/Sounds/';
+		const defaultPath = `${defaultDir}${defaultFilename}`;
+		const isTauri = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
+
+		if (isTauri) {
+			try {
+				const filePath = await save({
+					defaultPath: defaultPath,
+					filters: [{ name: 'File Audio MP3 (*.mp3)', extensions: ['mp3'] }]
+				});
+				
+				if (filePath) {
+					const response = await fetch(audioBlobUrl);
+					const buffer = await response.arrayBuffer();
+					await writeFile(filePath, new Uint8Array(buffer));
+					savedNotification = {
+						type: 'success',
+						message: 'File salvato con successo!',
+						path: filePath
+					};
+				}
+			} catch (err: any) {
+				console.error("Failed to save file in Tauri:", err);
+				savedNotification = {
+					type: 'error',
+					message: `Errore durante il salvataggio: ${err?.message || err}`
+				};
+			}
+		} else {
+			try {
+				const a = document.createElement('a');
+				a.href = audioBlobUrl;
+				a.download = defaultFilename;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				savedNotification = {
+					type: 'success',
+					message: `Download avviato nel browser (${defaultFilename})`
+				};
+			} catch (err: any) {
+				savedNotification = {
+					type: 'error',
+					message: `Errore durante il download: ${err?.message || err}`
+				};
+			}
+		}
 	}
 
 	function formatTime(seconds: number): string {
@@ -443,6 +490,24 @@
 					<span>Scarica MP3</span>
 				</button>
 			</div>
+
+			<!-- Saved Notification / Location feedback -->
+			{#if savedNotification}
+				<div class="p-3.5 rounded-xl text-xs flex items-start gap-2.5 transition-all shadow-md {savedNotification.type === 'success' ? 'bg-emerald-950/80 border border-emerald-700/80 text-emerald-200' : 'bg-red-950/80 border border-red-700/80 text-red-200'}">
+					<span class="text-base select-none">{savedNotification.type === 'success' ? '✅' : '⚠️'}</span>
+					<div class="flex-1 min-w-0">
+						<p class="font-semibold text-gray-100">{savedNotification.message}</p>
+						{#if savedNotification.path}
+							<div class="mt-1.5 flex items-center gap-1.5">
+								<span class="text-[10px] uppercase font-bold text-emerald-400/80">Percorso:</span>
+								<code class="font-mono text-[11px] text-emerald-300 break-all select-all bg-emerald-900/50 px-2 py-0.5 rounded border border-emerald-800/60">
+									{savedNotification.path}
+								</code>
+							</div>
+						{/if}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>

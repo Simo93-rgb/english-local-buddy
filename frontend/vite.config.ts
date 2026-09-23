@@ -16,5 +16,11 @@ export default defineConfig({
 				ws: true,
 			},
 		},
+		fs: {
+			allow: [
+				'/home/simone/GitHub/English Buddy',
+				'/mnt/Samsung850/GitHub/English Buddy'
+			],
+		},
 	},
 });

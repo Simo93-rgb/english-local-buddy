@@ -11,6 +11,12 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.11.0
         version: 2.11.0
+      '@tauri-apps/plugin-dialog':
+        specifier: ~2.7.3
+        version: 2.7.3
+      '@tauri-apps/plugin-fs':
+        specifier: ~2.5.2
+        version: 2.5.2
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.1
@@ -394,6 +400,12 @@ packages:
     resolution: {integrity: sha512-W5Wbuqsb2pHFPTj4TaRNKTj5rwXhDShPiLSY9T18y4ouSR/NNCptAEFxFsBtyNRgL6Vs1a/q9LzfqqYzEwC+Jw==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-dialog@2.7.3':
+    resolution: {integrity: sha512-CRgE+7TP4tvq9MjBU6f04NLTFIqVMLKHk3hAqlhil00ngK9ACTrXPH3oHpKMProxILodd3YjBoKbMwSI4IEcfA==}
+
+  '@tauri-apps/plugin-fs@2.5.2':
+    resolution: {integrity: sha512-XXvMSnFiob+G1H+YHCDf+bzWVumseQuEIhzpbOJzevUfL4k0U+sTApZWJHpoLiamggnVPJm5dJ5sDsniRyWxlg==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -972,6 +984,14 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.11.0
       '@tauri-apps/cli-win32-ia32-msvc': 2.11.0
       '@tauri-apps/cli-win32-x64-msvc': 2.11.0
+
+  '@tauri-apps/plugin-dialog@2.7.3':
+    dependencies:
+      '@tauri-apps/api': 2.11.0
+
+  '@tauri-apps/plugin-fs@2.5.2':
+    dependencies:
+      '@tauri-apps/api': 2.11.0
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
