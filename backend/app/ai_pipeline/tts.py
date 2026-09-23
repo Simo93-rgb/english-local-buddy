@@ -154,46 +154,6 @@ def is_chinese_or_pinyin(word: str) -> bool:
     return False
 
 
-def split_italian_segment_by_chinese(it_text: str) -> list[tuple[str, str]]:
-    """
-    Sub-segment an Italian text fragment by rescuing any Hanzi or Pinyin tokens that were
-    accidentally embedded without <zh> tags or placed inside an <it> tag block.
-    """
-    tokens = re.split(r"(\s+|[.,;:!?\"'“”«»()]+)", it_text)
-    sub_segments: list[tuple[str, str]] = []
-    current_lang = "it"
-    current_buffer: list[str] = []
-
-    for tok in tokens:
-        if not tok:
-            continue
-        if is_chinese_or_pinyin(tok):
-            if current_lang == "it" and current_buffer:
-                flushed = clean_speech_segment("".join(current_buffer))
-                if flushed:
-                    sub_segments.append(("it", flushed))
-                current_buffer = []
-            current_lang = "zh"
-            current_buffer.append(tok)
-        elif re.match(r"^[\s.,;:!?\"'“”«»()]+$", tok):
-            current_buffer.append(tok)
-        else:
-            if current_lang == "zh" and current_buffer:
-                flushed = clean_speech_segment("".join(current_buffer))
-                if flushed:
-                    sub_segments.append(("zh", flushed))
-                current_buffer = []
-            current_lang = "it"
-            current_buffer.append(tok)
-
-    if current_buffer:
-        flushed = clean_speech_segment("".join(current_buffer))
-        if flushed:
-            sub_segments.append((current_lang, flushed))
-
-    return sub_segments
-
-
 def clean_speech_segment(text: str) -> str:
     """
     Strip markdown formatting and standalone bullet markers for natural speech synthesis.
@@ -212,61 +172,99 @@ def clean_speech_segment(text: str) -> str:
         return ""
     return t
 
+from langdetect import detect, detect_langs
 
-def parse_language_tags(text: str, default_lang: str = "it") -> list[tuple[str, str]]:
+def detect_language(text: str) -> str:
     """
-    Parse text containing <it>...</it> and <zh>...</zh> tags into sequential (language, text) segments.
-    Uses token stream parsing and automatically rescues untagged Chinese characters / Pinyin from Italian text.
-    Cleans markdown formatting from each segment for natural TTS synthesis.
+    Detect whether a clean speech segment is English or Italian using langdetect.
+    Defaults to 'en' for ambiguous or unsupported languages, as the multilingual voice handles English well.
     """
-    if not text:
-        return []
+    clean = clean_speech_segment(text)
+    if not clean:
+        return "en"
+    try:
+        lang = detect(clean)
+        return "it" if lang == "it" else "en"
+    except:
+        return "en"
 
-    # Check if any tags are present
-    has_tags = bool(re.search(r"</?(?:it|zh|en)>", text, re.IGNORECASE))
-
-    if not has_tags:
-        # Fallback: if no tags present, split Italian text by Chinese/Pinyin
-        return split_italian_segment_by_chinese(text) if default_lang in ("it", "zh") else [(default_lang, clean_speech_segment(text))]
-
-    # Tokenize by tags
-    tokens = re.split(r"(</?[a-zA-Z]+>)", text)
-    raw_segments: list[tuple[str, str]] = []
-    current_lang = default_lang
+def segment_sentence(sentence: str) -> list[tuple[str, str]]:
+    """
+    Segment a single sentence into Chinese/Pinyin vs Other components.
+    """
+    tokens = re.split(r"(\s+|[.,;:!?\"'“”«»()。！？]+)", sentence)
+    segments = []
+    current_lang = None
+    current_buffer = []
 
     for tok in tokens:
         if not tok:
             continue
-        m_open = re.match(r"^<(it|zh|en)>$", tok, re.IGNORECASE)
-        m_close = re.match(r"^</(it|zh|en)>$", tok, re.IGNORECASE)
-        if m_open:
-            current_lang = m_open.group(1).lower()
-        elif m_close:
-            current_lang = default_lang
+        if is_chinese_or_pinyin(tok):
+            tok_lang = "zh"
+        elif re.match(r"^[\s.,;:!?\"'“”«»()。！？]+$", tok):
+            tok_lang = None
         else:
-            clean = clean_speech_segment(tok)
-            if clean:
-                raw_segments.append((current_lang, clean))
-
-    # Secondary rescue pass: rescue any Chinese characters or Pinyin trapped inside "it" segments
-    expanded_segments: list[tuple[str, str]] = []
-    for lang, content in raw_segments:
-        if lang == "it" and default_lang in ("it", "zh"):
-            sub_segs = split_italian_segment_by_chinese(content)
-            expanded_segments.extend(sub_segs)
+            tok_lang = "other"
+            
+        if tok_lang == "zh":
+            if current_lang == "other" and current_buffer:
+                segments.append(("other", "".join(current_buffer)))
+                current_buffer = []
+            current_lang = "zh"
+            current_buffer.append(tok)
+        elif tok_lang == "other":
+            if current_lang == "zh" and current_buffer:
+                segments.append(("zh", "".join(current_buffer)))
+                current_buffer = []
+            current_lang = "other"
+            current_buffer.append(tok)
         else:
-            expanded_segments.append((lang, content))
+            current_buffer.append(tok)
 
-    # Merge consecutive segments with the same language
+    if current_buffer:
+        segments.append((current_lang if current_lang else "other", "".join(current_buffer)))
+        
+    final_segments = []
+    for lang, content in segments:
+        if not content.strip():
+            continue
+        if lang == "zh":
+            final_segments.append(("zh", content))
+        else:
+            detected = detect_language(content)
+            final_segments.append((detected, content))
+    return final_segments
+
+def parse_language_tags(text: str, default_lang: str = "en") -> list[tuple[str, str]]:
+    """
+    Parse and segment multilingual text into (language, text) tuples.
+    This replaces naive tag parsing with robust sentence-level language detection (langdetect)
+    and precise token-level extraction of Hanzi/Pinyin.
+    """
+    # First, strip any existing <it>, <zh>, <en> tags from the LLM to rely on pure text analysis
+    text = re.sub(r"</?(?:it|zh|en)>", " ", text, flags=re.IGNORECASE)
+    
+    # Split into sentences using punctuation
+    sentences = re.split(r'(?<=[.!?。！？\n])\s+', text)
+    
+    all_segments = []
+    for sent in sentences:
+        if not sent.strip():
+            continue
+        all_segments.extend(segment_sentence(sent))
+        
+    # Merge contiguous segments of the same language
     merged: list[tuple[str, str]] = []
-    for lang, content in expanded_segments:
-        if not content:
+    for lang, content in all_segments:
+        clean = clean_speech_segment(content)
+        if not clean:
             continue
         if merged and merged[-1][0] == lang:
-            merged[-1] = (lang, f"{merged[-1][1]} {content}")
+            merged[-1] = (lang, merged[-1][1] + " " + clean)
         else:
-            merged.append((lang, content))
-
+            merged.append((lang, clean))
+            
     return merged
 
 
@@ -373,10 +371,6 @@ class TTSManager:
         """
         if not text or not text.strip():
             return b""
-
-        # In English mode without tags, use simple single-voice fast path
-        if default_language == "en" and not re.search(r"<(?:it|zh)>", text, re.IGNORECASE):
-            return await self.generate_audio(text, voice=self.get_voice_for_language("en"))
 
         segments = parse_language_tags(text, default_lang="it" if default_language == "zh" else default_language)
         if not segments:
