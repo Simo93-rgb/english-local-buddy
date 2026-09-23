@@ -9,6 +9,8 @@
  */
 
 import { writable, derived, get } from 'svelte/store';
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeFile } from '@tauri-apps/plugin-fs';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -509,5 +511,66 @@ export async function generateTTSAudio(params: {
 	}
 
 	return (await response.json()) as TTSGenerateResult;
+}
+
+/**
+ * Save audio (Base64 MP3) to disk using native Tauri dialog if available,
+ * or browser download fallback. Defaults to saving in /home/simone/Musica/Sounds/.
+ */
+export async function saveAudioFile(params: {
+	b64Data: string;
+	filename: string;
+	format?: string;
+}): Promise<{ success: boolean; path?: string; message: string }> {
+	const defaultFilename = params.filename.endsWith('.mp3') ? params.filename : `${params.filename}.mp3`;
+	const defaultDir = '/home/simone/Musica/Sounds/';
+	const defaultPath = `${defaultDir}${defaultFilename}`;
+	const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+
+	try {
+		const byteChars = atob(params.b64Data);
+		const byteArray = new Uint8Array(byteChars.length);
+		for (let i = 0; i < byteChars.length; i++) {
+			byteArray[i] = byteChars.charCodeAt(i);
+		}
+
+		if (isTauri) {
+			const filePath = await save({
+				defaultPath: defaultPath,
+				filters: [{ name: 'File Audio MP3 (*.mp3)', extensions: ['mp3'] }],
+			});
+
+			if (filePath) {
+				await writeFile(filePath, byteArray);
+				return {
+					success: true,
+					path: filePath,
+					message: 'File audio salvato con successo!',
+				};
+			} else {
+				return { success: false, message: 'Salvataggio annullato.' };
+			}
+		} else {
+			const blob = new Blob([byteArray], { type: `audio/${params.format || 'mp3'}` });
+			const blobUrl = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = blobUrl;
+			a.download = defaultFilename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+			return {
+				success: true,
+				message: `Download avviato nel browser (${defaultFilename})`,
+			};
+		}
+	} catch (err: any) {
+		console.error('Failed to save audio file:', err);
+		return {
+			success: false,
+			message: `Errore durante il salvataggio: ${err?.message || err}`,
+		};
+	}
 }
 

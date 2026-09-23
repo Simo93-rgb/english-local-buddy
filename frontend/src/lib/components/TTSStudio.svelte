@@ -1,7 +1,10 @@
 <script lang="ts">
-	import { generateTTSAudio, type TTSGenerateResult } from '$lib/stores/audioStore';
-	import { save } from '@tauri-apps/plugin-dialog';
-	import { writeFile } from '@tauri-apps/plugin-fs';
+	import {
+		generateTTSAudio,
+		saveAudioFile,
+		currentLanguage,
+		type TTSGenerateResult
+	} from '$lib/stores/audioStore';
 
 	// Component state
 	let inputText = $state<string>('');
@@ -27,7 +30,7 @@
 			: inputText.trim().split(/\s+/).filter(Boolean).length
 	);
 
-	// Quick pinyin diacritic vowels for easy typing
+	// Quick pinyin diacritic vowels for easy typing (Chinese only)
 	const pinyinVowels = [
 		['ā', 'á', 'ǎ', 'à'],
 		['ē', 'é', 'ě', 'è'],
@@ -38,13 +41,23 @@
 	];
 
 	// Presets
-	const samplePhrases = [
+	const chineseSamplePhrases = [
 		{ label: 'Saluto base', text: 'nǐ hǎo, huānyíng nǐ!' },
 		{ label: '4 Toni (mā má mǎ mà)', text: 'mā má mǎ mà' },
 		{ label: 'Come ti chiami?', text: 'nǐ jiào shénme míngzi?' },
 		{ label: 'Hanzi (Piacere di conoscerti)', text: '你好，很高兴认识你！' },
 		{ label: 'Hanzi (Studio il cinese)', text: '我正在努力学中文。' },
 	];
+
+	const englishSamplePhrases = [
+		{ label: 'Tongue Twister', text: 'The quick brown fox jumps over the lazy dog.' },
+		{ label: 'Seashells (Fonetica)', text: 'She sells seashells on the seashore.' },
+		{ label: 'Connected Speech', text: 'Could you please give me a bottle of water?' },
+		{ label: 'Though / Through', text: 'Through tough, thorough thought, though.' },
+		{ label: 'Natural Rhythm', text: 'I am really looking forward to practicing English today.' },
+	];
+
+	let samplePhrases = $derived($currentLanguage === 'zh' ? chineseSamplePhrases : englishSamplePhrases);
 
 	function insertChar(char: string) {
 		inputText += char;
@@ -97,7 +110,9 @@
 
 	async function handleGenerate() {
 		if (!inputText.trim()) {
-			errorMessage = 'Inserisci del testo in Pinyin o caratteri cinesi prima di generare.';
+			errorMessage = $currentLanguage === 'zh'
+				? 'Inserisci del testo in Pinyin o caratteri cinesi prima di generare.'
+				: 'Inserisci del testo in inglese prima di generare.';
 			return;
 		}
 
@@ -108,7 +123,8 @@
 		try {
 			const res = await generateTTSAudio({
 				text: inputText.trim(),
-				language: 'zh',
+				language: $currentLanguage,
+				voice: $currentLanguage === 'zh' ? 'zh-CN-XiaoxiaoNeural' : 'en-US-AvaMultilingualNeural',
 				rate: getRateParam(selectedSpeed),
 				pitch: getPitchParam(selectedPitch),
 			});
@@ -177,57 +193,21 @@
 	}
 
 	async function downloadAudio() {
-		if (!audioBlobUrl || !generatedResult) return;
-
+		if (!generatedResult) return;
 		savedNotification = null;
-		const defaultFilename = generatedResult.filename || 'pronuncia_chinese_buddy.mp3';
-		const defaultDir = '/home/simone/Musica/Sounds/';
-		const defaultPath = `${defaultDir}${defaultFilename}`;
-		const isTauri = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
 
-		if (isTauri) {
-			try {
-				const filePath = await save({
-					defaultPath: defaultPath,
-					filters: [{ name: 'File Audio MP3 (*.mp3)', extensions: ['mp3'] }]
-				});
-				
-				if (filePath) {
-					const response = await fetch(audioBlobUrl);
-					const buffer = await response.arrayBuffer();
-					await writeFile(filePath, new Uint8Array(buffer));
-					savedNotification = {
-						type: 'success',
-						message: 'File salvato con successo!',
-						path: filePath
-					};
-				}
-			} catch (err: any) {
-				console.error("Failed to save file in Tauri:", err);
-				savedNotification = {
-					type: 'error',
-					message: `Errore durante il salvataggio: ${err?.message || err}`
-				};
-			}
-		} else {
-			try {
-				const a = document.createElement('a');
-				a.href = audioBlobUrl;
-				a.download = defaultFilename;
-				document.body.appendChild(a);
-				a.click();
-				document.body.removeChild(a);
-				savedNotification = {
-					type: 'success',
-					message: `Download avviato nel browser (${defaultFilename})`
-				};
-			} catch (err: any) {
-				savedNotification = {
-					type: 'error',
-					message: `Errore durante il download: ${err?.message || err}`
-				};
-			}
-		}
+		const defaultFilename = generatedResult.filename || ($currentLanguage === 'zh' ? 'pronuncia_chinese.mp3' : 'pronunciation_english.mp3');
+		const res = await saveAudioFile({
+			b64Data: generatedResult.audio_b64,
+			filename: defaultFilename,
+			format: 'mp3',
+		});
+
+		savedNotification = {
+			type: res.success ? 'success' : 'error',
+			message: res.message,
+			path: res.path,
+		};
 	}
 
 	function formatTime(seconds: number): string {
@@ -252,16 +232,29 @@
 	<div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-gray-800/80 mb-4">
 		<!-- Voice indicator -->
 		<div class="flex items-center gap-2.5">
-			<span class="text-xl">🇨🇳</span>
-			<span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-gray-800 text-rose-300 border border-gray-700">
-				cmn-CN
-			</span>
-			<div class="flex items-center gap-1.5">
-				<span class="text-sm font-bold text-gray-100">Xiaoxiao CN</span>
-				<span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">
-					HD Femminile
+			{#if $currentLanguage === 'zh'}
+				<span class="text-xl">🇨🇳</span>
+				<span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-gray-800 text-rose-300 border border-gray-700">
+					cmn-CN
 				</span>
-			</div>
+				<div class="flex items-center gap-1.5">
+					<span class="text-sm font-bold text-gray-100">Xiaoxiao CN</span>
+					<span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60">
+						HD Femminile
+					</span>
+				</div>
+			{:else}
+				<span class="text-xl">🇬🇧</span>
+				<span class="text-xs font-mono font-semibold px-2 py-0.5 rounded bg-gray-800 text-indigo-300 border border-gray-700">
+					en-US
+				</span>
+				<div class="flex items-center gap-1.5">
+					<span class="text-sm font-bold text-gray-100">Ava Multilingual</span>
+					<span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60">
+						HD Femminile
+					</span>
+				</div>
+			{/if}
 		</div>
 
 		<!-- Audio controls: Speed, Pitch, Volume -->
@@ -302,26 +295,32 @@
 		</div>
 	</div>
 
-	<!-- Pinyin Toolbar: Quick Diacritics insertion & actions -->
+	<!-- Toolbar: Quick Actions & Presets -->
 	<div class="flex flex-wrap items-center justify-between gap-2 mb-3 px-1">
-		<!-- Quick tone marks buttons -->
-		<div class="flex flex-wrap items-center gap-1">
-			<span class="text-xs text-gray-400 mr-1 hidden sm:inline">Accenti Pinyin:</span>
-			{#each pinyinVowels as group}
-				<div class="flex items-center bg-gray-950/70 rounded-md border border-gray-800/80 p-0.5 mr-1">
-					{#each group as v}
-						<button
-							type="button"
-							onclick={() => insertChar(v)}
-							class="w-6 h-6 text-xs font-mono font-medium rounded hover:bg-rose-900/40 hover:text-rose-200 text-gray-300 transition-colors flex items-center justify-center cursor-pointer"
-							title={`Inserisci ${v}`}
-						>
-							{v}
-						</button>
-					{/each}
-				</div>
-			{/each}
-		</div>
+		{#if $currentLanguage === 'zh'}
+			<!-- Quick tone marks buttons (Pinyin) -->
+			<div class="flex flex-wrap items-center gap-1">
+				<span class="text-xs text-gray-400 mr-1 hidden sm:inline">Accenti Pinyin:</span>
+				{#each pinyinVowels as group}
+					<div class="flex items-center bg-gray-950/70 rounded-md border border-gray-800/80 p-0.5 mr-1">
+						{#each group as v}
+							<button
+								type="button"
+								onclick={() => insertChar(v)}
+								class="w-6 h-6 text-xs font-mono font-medium rounded hover:bg-rose-900/40 hover:text-rose-200 text-gray-300 transition-colors flex items-center justify-center cursor-pointer"
+								title={`Inserisci ${v}`}
+							>
+								{v}
+							</button>
+						{/each}
+					</div>
+				{/each}
+			</div>
+		{:else}
+			<div class="text-xs text-indigo-300 flex items-center gap-1.5 font-medium">
+				<span>💡 Inserisci parole, frasi o scioglilingua per ascoltare la pronuncia HD</span>
+			</div>
+		{/if}
 
 		<!-- Action tools: Samples and Clear -->
 		<div class="flex items-center gap-2">
@@ -333,12 +332,12 @@
 				>
 					<span>💡 Esempi</span>
 				</button>
-				<div class="absolute right-0 top-full mt-1 hidden group-hover:block group-focus-within:block z-20 w-56 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-1">
+				<div class="absolute right-0 top-full mt-1 hidden group-hover:block group-focus-within:block z-20 w-64 bg-gray-900 border border-gray-800 rounded-xl shadow-xl p-1.5 space-y-1">
 					{#each samplePhrases as sample}
 						<button
 							type="button"
 							onclick={() => applySample(sample.text)}
-							class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs hover:bg-rose-950/50 hover:text-rose-200 text-gray-300 transition-colors cursor-pointer"
+							class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs {$currentLanguage === 'zh' ? 'hover:bg-rose-950/50 hover:text-rose-200' : 'hover:bg-indigo-950/50 hover:text-indigo-200'} text-gray-300 transition-colors cursor-pointer"
 						>
 							<div class="font-semibold text-[11px] text-gray-400">{sample.label}</div>
 							<div class="font-mono text-gray-200 truncate">{sample.text}</div>
@@ -366,8 +365,10 @@
 		<textarea
 			bind:value={inputText}
 			rows="5"
-			placeholder="Scrivi qui in caratteri cinesi (es. 你好，很高兴认识你) oppure in Pinyin con accenti (nǐ hǎo) o numeri (ni3 hao3)..."
-			class="w-full rounded-xl bg-gray-950/70 border border-gray-800 focus:border-rose-500 focus:ring-1 focus:ring-rose-500/40 p-4 text-gray-100 placeholder-gray-500 text-base font-normal resize-y min-h-[140px] focus:outline-none transition-all leading-relaxed"
+			placeholder={$currentLanguage === 'zh'
+				? 'Scrivi qui in caratteri cinesi (es. 你好，很高兴认识你) oppure in Pinyin con accenti (nǐ hǎo) o numeri (ni3 hao3)...'
+				: 'Scrivi qui qualsiasi parola o frase in inglese (es. The quick brown fox jumps over the lazy dog)...'}
+			class="w-full rounded-xl bg-gray-950/70 border border-gray-800 {$currentLanguage === 'zh' ? 'focus:border-rose-500 focus:ring-rose-500/40' : 'focus:border-indigo-500 focus:ring-indigo-500/40'} focus:ring-1 p-4 text-gray-100 placeholder-gray-500 text-base font-normal resize-y min-h-[140px] focus:outline-none transition-all leading-relaxed"
 		></textarea>
 	</div>
 

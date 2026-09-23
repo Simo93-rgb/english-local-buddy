@@ -15,12 +15,15 @@
 		currentMode,
 		setAppMode,
 		latestToneAnalysis,
+		latestAudioB64,
+		saveAudioFile,
 		type ChineseLevel,
 	} from '$lib/stores/audioStore';
 	import TTSStudio from '$lib/components/TTSStudio.svelte';
 
 	let error = $state<string | null>(null);
 	let reportMessage = $state<string | null>(null);
+	let downloadingAudio = $state<boolean>(false);
 
 	function handleTutorSelect(value: string) {
 		if (value === 'tts_studio') {
@@ -28,6 +31,34 @@
 		} else {
 			setAppMode('tutor');
 			setChineseLevel(value as ChineseLevel);
+		}
+	}
+
+	async function handleDownloadResponseAudio() {
+		const audioData = $latestAudioB64;
+		if (!audioData || !audioData.b64) return;
+		downloadingAudio = true;
+		try {
+			const cleanText = (audioData.text || 'buddy_response')
+				.replace(/[^\w\u4e00-\u9fff-]+/g, '_')
+				.slice(0, 25)
+				.replace(/^_+|_+$/g, '') || 'audio_risposta';
+			const filename = `${cleanText}_${audioData.language}.mp3`;
+			const res = await saveAudioFile({
+				b64Data: audioData.b64,
+				filename,
+				format: audioData.format || 'mp3',
+			});
+			if (res.success) {
+				reportMessage = `Audio scaricato con successo in: ${res.path || filename}`;
+				setTimeout(() => {
+					reportMessage = null;
+				}, 8000);
+			} else if (res.message !== 'Salvataggio annullato.') {
+				error = res.message;
+			}
+		} finally {
+			downloadingAudio = false;
 		}
 	}
 
@@ -125,7 +156,11 @@
 					🚀 Conversational Buddy: Dialogo Fluente in Cinese Mandarino
 				{/if}
 			{:else}
-				Local English Pronunciation & Conversation Trainer
+				{#if $currentMode === 'tts_studio'}
+					🎙️ Generatore Audio HD: Sintesi Vocale e Pronuncia Naturale in Inglese Americano
+				{:else}
+					🗣️ Conversational Partner: Pratica Vocale Naturale & Pronuncia Inglese
+				{/if}
 			{/if}
 		</p>
 	</header>
@@ -140,13 +175,54 @@
 			<span>English Buddy</span>
 		</button>
 		<button
-			onclick={() => setLanguage('zh')}
+			onclick={() => { setLanguage('zh'); setAppMode('tutor'); }}
 			class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 {$currentLanguage === 'zh' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30' : 'text-gray-400 hover:text-gray-200'}"
 		>
 			<span class="text-sm">🇨🇳</span>
 			<span>Chinese Buddy</span>
 		</button>
 	</div>
+
+	<!-- English Tutor & Tool Selector -->
+	{#if $currentLanguage === 'en'}
+		<div class="mb-6 w-full max-w-xl flex flex-col items-center gap-2.5">
+			<!-- Menu a tendina principale -->
+			<div class="w-full flex items-center justify-between gap-3 bg-gray-900/90 p-2.5 px-4 rounded-2xl border border-indigo-900/40 shadow-lg">
+				<label for="en-tutor-mode-select" class="text-xs font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+					<span>Tutor / Strumento:</span>
+				</label>
+				<select
+					id="en-tutor-mode-select"
+					value={$currentMode}
+					onchange={(e) => setAppMode((e.target as HTMLSelectElement).value as any)}
+					class="w-full bg-gray-950 text-gray-100 text-xs sm:text-sm font-medium py-2 px-3 rounded-xl border border-indigo-900/40 focus:border-indigo-500 focus:outline-none cursor-pointer"
+				>
+					<optgroup label="Tutor Interattivo (Conversazione Vocale)">
+						<option value="tutor">🗣️ Conversational Partner (Pratica Vocale Naturale)</option>
+					</optgroup>
+					<optgroup label="Strumenti Audio AI">
+						<option value="tts_studio">🎙️ Generatore Audio HD (Pronuncia Inglese & TTS)</option>
+					</optgroup>
+				</select>
+			</div>
+
+			<!-- Quick tabs selector -->
+			<div class="flex flex-wrap items-center justify-center gap-1.5 bg-gray-900/70 p-1.5 rounded-2xl border border-indigo-900/30 shadow-inner w-full">
+				<button
+					onclick={() => setAppMode('tutor')}
+					class="px-4 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tutor' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-400 hover:text-indigo-200'}"
+				>
+					<span>🗣️ Conversational Partner</span>
+				</button>
+				<button
+					onclick={() => setAppMode('tts_studio')}
+					class="px-4 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 {$currentMode === 'tts_studio' ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30' : 'text-gray-400 hover:text-blue-300'}"
+				>
+					<span>🎙️ Generatore Audio HD</span>
+				</button>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Chinese Tutor & Tool Selector (Menu a tendina + quick tabs) -->
 	{#if $currentLanguage === 'zh'}
@@ -302,10 +378,24 @@
 		<!-- Bot's response -->
 		{#if $latestLLMResponse}
 			<div class="rounded-2xl border {$currentLanguage === 'zh' ? 'border-rose-900/50 bg-rose-950/20' : 'border-cyan-900/50 bg-cyan-950/30'} backdrop-blur p-5">
-				<div class="flex items-center gap-2 mb-2">
+				<div class="flex items-center justify-between gap-2 mb-2">
 					<span class="text-xs font-semibold {$currentLanguage === 'zh' ? 'text-rose-300' : 'text-cyan-400'} uppercase tracking-wider">
 						{$currentLanguage === 'zh' ? '🇨🇳 Buddy (Tutor Cinese)' : '🤖 Buddy'}
 					</span>
+
+					{#if $latestAudioB64 && $latestAudioB64.b64}
+						<button
+							onclick={handleDownloadResponseAudio}
+							disabled={downloadingAudio}
+							class="text-xs px-2.5 py-1 rounded-lg bg-gray-900/80 hover:bg-gray-800 text-gray-300 hover:text-white border border-gray-700/60 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+							title="Scarica la risposta vocale in MP3 sul tuo computer"
+						>
+							<svg class="w-3.5 h-3.5 {$currentLanguage === 'zh' ? 'text-rose-400' : 'text-cyan-400'}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+							</svg>
+							<span>{downloadingAudio ? 'Salvataggio…' : 'Scarica MP3'}</span>
+						</button>
+					{/if}
 				</div>
 				<p class="text-lg text-gray-100">{$latestLLMResponse}</p>
 			</div>
